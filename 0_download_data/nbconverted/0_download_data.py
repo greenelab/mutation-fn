@@ -10,9 +10,11 @@
 # In[1]:
 
 
-import os
 import pandas as pd
 from urllib.request import urlretrieve
+
+import sys; sys.path.append('..')
+import config as cfg
 
 
 # First, we load a manifest file containing the GDC API ID and filename for each relevant file, as well as the md5 checksum to make sure the whole/uncorrupted file was downloaded.
@@ -22,7 +24,7 @@ from urllib.request import urlretrieve
 # In[2]:
 
 
-manifest_df = pd.read_csv(os.path.join('data', 'manifest.tsv'),
+manifest_df = pd.read_csv(cfg.data_dir / 'manifest.tsv',
                           sep='\t', index_col=0)
 manifest_df.head()
 
@@ -34,9 +36,9 @@ manifest_df.head()
 
 rnaseq_id, rnaseq_filename = manifest_df.loc['rna_seq'].id, manifest_df.loc['rna_seq'].filename
 url = 'http://api.gdc.cancer.gov/data/{}'.format(rnaseq_id)
-exp_filepath = os.path.join('data', rnaseq_filename)
+exp_filepath = cfg.data_dir / rnaseq_filename
 
-if not os.path.exists(exp_filepath):
+if not exp_filepath.is_file():
     urlretrieve(url, exp_filepath)
 else:
     print('Downloaded data file already exists, skipping download')
@@ -57,9 +59,9 @@ assert md5_sum[0].split(' ')[0] == manifest_df.loc['rna_seq'].md5
 
 mutation_id, mutation_filename = manifest_df.loc['mutation'].id, manifest_df.loc['mutation'].filename
 url = 'http://api.gdc.cancer.gov/data/{}'.format(mutation_id)
-mutation_filepath = os.path.join('data', mutation_filename)
+mutation_filepath = cfg.data_dir / mutation_filename
 
-if not os.path.exists(mutation_filepath):
+if not mutation_filepath.is_file():
     urlretrieve(url, mutation_filepath)
 else:
     print('Downloaded data file already exists, skipping download')
@@ -123,6 +125,6 @@ park_gain_df.head()
 # In[10]:
 
 
-park_loss_df.to_csv('./data/park_loss_df.tsv', sep='\t')
-park_gain_df.to_csv('./data/park_gain_df.tsv', sep='\t')
+park_loss_df.to_csv(cfg.data_dir / 'park_loss_df.tsv', sep='\t')
+park_gain_df.to_csv(cfg.data_dir / 'park_gain_df.tsv', sep='\t')
 
