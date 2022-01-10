@@ -3,7 +3,7 @@
 
 # ## Process MAF file from MC3 to get sample-specific information
 # 
-# We want to know if samples with mutations in tumor suppressors have mono-allelic or biallelic knockouts.
+# We want to know if samples with mutations in tumor suppressors have mono-allelic or biallelic knockouts. Our mutation data comes from [the MC3 project](https://gdc.cancer.gov/about-data/publications/mc3-2017), which aggregates mutation calls for TCGA samples from several different calling algorithms and scoring approaches.
 
 # In[1]:
 

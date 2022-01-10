@@ -3,9 +3,11 @@
 
 # ## Analysis of prediction distributions for tumor suppressor genes
 # 
-# Looking at some distributions of mutation prediction models by hand, we can see that some of them are very unimodal (samples with a mutation mostly have predicted probabilities close to 1), and some of them have higher variance/are bimodal (many samples with a mutation have predicted probabilities close to 0). We noticed that many of the higher variance genes are tumor suppressors, so this notebook explores that further.
+# In this notebook, we want to integrate observed mutation information (point mutations and CNVs) from TCGA with the mutation prediction classifiers we trained for [the `mpmp` project](https://github.com/greenelab/mpmp).
 # 
-# Our guess is that this is occurring because [two hits (deleterious mutations) are required](https://en.wikipedia.org/wiki/Two-hit_hypothesis) to inactivate most tumor suppressors. We want to see if the false negatives with low predicted probabilities only have a single mutation in the gene of interest (i.e. only one allele is mutated).
+# [Figure 1 of our paper](https://greenelab.github.io/mpmp-manuscript/), and the associated text in the results section, has a more detailed description of how our classifiers work. For now, we're only using the classifiers trained on gene expression data.
+# 
+# In particular, we want to explore false negative samples: is there a reason that some samples with a mutation in a given gene might get assigned a low probability of having that mutation? Is this effect specific to certain genes, or certain types of samples?
 
 # In[1]:
 
@@ -110,9 +112,11 @@ plt.ylabel('number of samples')
 
 # ### Add copy number info to count
 # 
-# We get this information from [the pancancer repo](https://github.com/greenelab/pancancer/tree/master/data), which [comes from GISTIC run on the TCGA samples](https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/download_data.sh#L33). For now, we just assume any copy change = 1 mutation. 
+# We get this information from [the `pancancer` repo](https://github.com/greenelab/pancancer/tree/master/data), which [comes from GISTIC run on the TCGA samples](https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/download_data.sh#L33). The version of the copy number info in the `pancancer` repo is "thresholded", which means each sample is described as having a shallow/deep copy change, or no copy change, in the given gene. This is as opposed to the CNV data on the GDC website, which just gives (relative) copy number ratios for each CNV without the thresholding.
 # 
-# Not sure if there's any way to get more granular info about copy number changes - we could look into this in the future.
+# For now, we just assume any deep copy change = 1 mutation, and we don't use shallow copy changes. This is what we've done for our classifiers in the past.
+# 
+# We may look into getting more granular CNV info in the future.
 
 # In[9]:
 
@@ -209,6 +213,12 @@ sns.set()
 sns.violinplot(data=preds_df, x='true_class', y='positive_prob')
 plt.title(gene)
 
+
+# Looking at a few of these distributions by hand, we can see that some of them are very unimodal (samples with a mutation mostly have predicted probabilities close to 1), and some of them have higher variance/are bimodal (many samples with a mutation have predicted probabilities close to 0). Many of the higher variance genes are tumor suppressors. See [the last few slides here](https://docs.google.com/presentation/d/1jmGOzEkYiGH4fyGSYRzrEUfdlF6LlCl8KS0FpbCCphY/edit?usp=sharing) for some examples.
+# 
+# Our guess is that this is occurring because [two hits (deleterious mutations) are required](https://en.wikipedia.org/wiki/Two-hit_hypothesis) to inactivate most tumor suppressors.
+# 
+# Next, we want to see if the false negatives with low predicted probabilities only have a single mutation in the gene of interest (i.e. only one allele is mutated).
 
 # In[18]:
 
