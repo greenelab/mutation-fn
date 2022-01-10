@@ -68,14 +68,14 @@ venn2_unweighted([park_loss_genes, vogelstein_genes], ['Park (loss)', 'Vogelstei
 plt.title('Park/Vogelstein gene set overlap')
 
 
-# In[8]:
+# In[7]:
 
 
 print(len(park_loss_genes - vogelstein_genes))
-print(park_loss_genes - vogelstein_genes)
+print(sorted(park_loss_genes - vogelstein_genes))
 
 
-# In[7]:
+# In[8]:
 
 
 sns.set_style('white')
@@ -91,5 +91,5 @@ plt.title('Park/Vogelstein gene set overlap')
 
 
 print(len(park_gain_genes - vogelstein_genes))
-print(park_gain_genes - vogelstein_genes)
+print(sorted(park_gain_genes - vogelstein_genes))
 

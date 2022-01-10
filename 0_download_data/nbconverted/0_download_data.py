@@ -122,9 +122,63 @@ print(park_gain_df.Gene.unique())
 park_gain_df.head()
 
 
+# ### Download oncogene/tumor suppressor information for Park et al. genes
+
 # In[10]:
 
 
-park_loss_df.to_csv(cfg.data_dir / 'park_loss_df.tsv', sep='\t')
-park_gain_df.to_csv(cfg.data_dir / 'park_gain_df.tsv', sep='\t')
+# downloaded from https://www.sciencedirect.com/science/article/pii/S009286741830237X
+# oncogene/TSG predictions for genes/cancer types using 20/20+ classifier
+class_df = pd.read_excel(
+    cfg.data_dir / '1-s2.0-S009286741830237X-mmc1.xlsx', 
+    sheet_name='Table S1', index_col='KEY', header=2
+)
+class_df.rename(columns={'Tumor suppressor or oncogene prediction (by 20/20+)':
+                         'classification'},
+                inplace=True)
+
+class_df.head()
+
+
+# In[11]:
+
+
+loss_class_df = (park_loss_df
+    .merge(class_df.loc[:, ['classification']], left_index=True, right_index=True)
+)
+
+# format oncogene/TSG classification to work with vogelstein genes
+loss_class_df['classification'] = (
+    loss_class_df.classification.str.replace('possible ', '')
+                                    .replace('tsg', 'TSG')
+                                    .replace('oncogene', 'Oncogene')
+)
+
+print(loss_class_df.classification.unique())
+loss_class_df.head()
+
+
+# In[12]:
+
+
+gain_class_df = (park_gain_df
+    .merge(class_df.loc[:, ['classification']], left_index=True, right_index=True)
+)
+
+# format oncogene/TSG classification to work with vogelstein genes
+gain_class_df['classification'] = (
+    gain_class_df.classification.str.replace('possible ', '')
+                                    .replace('tsg', 'TSG')
+                                    .replace('oncogene', 'Oncogene')
+)
+
+print(gain_class_df.classification.unique())
+gain_class_df.head()
+
+
+# In[13]:
+
+
+loss_class_df.to_csv(cfg.data_dir / 'park_loss_df.tsv', sep='\t')
+gain_class_df.to_csv(cfg.data_dir / 'park_gain_df.tsv', sep='\t')
 
