@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## blah blah
+# ## Re-analysis of Park et al. findings using gene expression-based mutation signatures
 # 
-# blah blah
+# TODO: document
 
 # In[1]:
 
@@ -133,4 +133,83 @@ gain_class = {g: gene_to_class(g) for g in park_gain_df.Gene.unique()}
 
 park_gain_df['class'] = park_gain_df.Gene.map(gain_class)
 park_gain_df.head()
+
+
+# ### Retrieve and format per-sample information
+# 
+# * Sample ID, gene/tissue (multi-index)
+# * Gene classification
+# * Mutation status for sample in gene
+# * CNV status for sample in gene
+# * Classifier probability
+
+# In[30]:
+
+
+from scipy.special import expit
+
+def get_info_for_gene_and_tissue(identifier, class_df):
+    gene, tissue = identifier.split('_')
+    preds_file = park_preds_dir / 'expression_{}_raw_preds.tsv'.format(identifier)
+    preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1,
+                           names=['sample_id', gene])
+    
+    # get predictions for identifier
+    preds_df['identifier'] = identifier
+    preds_df['positive_prob'] = expit(preds_df[gene])
+    preds_df.drop(columns=[gene], inplace=True)
+    
+    # get mutation status for samples
+    preds_df['mutation_status'] = mutation_df.loc[preds_df.index, gene]
+    
+    
+    # get copy status for samples
+    id_class = class_df.loc[identifier, 'classification']
+    print(id_class)
+    if id_class == 'TSG':
+        copy_status = copy_loss_df.loc[preds_df.index, gene]
+    elif id_class == 'Oncogene':
+        copy_status = copy_gain_df.loc[preds_df.index, gene]
+    preds_df['copy_status'] = copy_status
+        
+    def status_from_mut_info(row):
+        if row['mutation_status'] == 1 and row['copy_status'] == 1:
+            return 'both'
+        elif row['mutation_status'] == 1 or row['copy_status'] == 1:
+            return 'one'
+        else:
+            return 'none'
+        
+    preds_df['status'] = preds_df.apply(status_from_mut_info, axis=1)
+    
+    return preds_df
+
+df = get_info_for_gene_and_tissue('TP53_STAD', park_loss_df)
+print(df.mutation_status.isna().sum())
+print(df.copy_status.isna().sum())
+df.head(20)
+
+
+# In[26]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+sns.violinplot(df.positive_prob)
+
+
+# In[44]:
+
+
+order = ['none', 'one', 'both']
+sns.set({'figure.figsize': (8, 6)})
+sns.boxplot(data=df, x='status', y='positive_prob',
+            order=order)
+
+def get_counts(status):
+    un = np.unique(status, return_counts=True)
+    return {s: c for s, c in zip(*un)}
+
+count_map = get_counts(df.status.values)
+plt.xticks(np.arange(3),
+           ['{} (n={})'.format(l, count_map[l]) for l in order])
 
