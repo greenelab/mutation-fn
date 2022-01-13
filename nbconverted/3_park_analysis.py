@@ -83,7 +83,7 @@ mutation_df.iloc[:5, :5]
 # https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/process_copynumber.py#L21
 
 copy_thresh_df = (
-    pd.read_csv(Path('data', 'pancan_GISTIC_threshold.tsv'),
+    pd.read_csv(cfg.data_dir / 'pancan_GISTIC_threshold.tsv',
                 sep='\t', index_col=0)
       .drop(columns=['Locus ID', 'Cytoband'])
 )
@@ -108,7 +108,7 @@ print(len(copy_samples))
 
 
 # make sure we're not losing too many samples, a few is fine
-print(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns))
+print(sorted(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns)))
 
 
 # In[10]:
@@ -177,7 +177,7 @@ class_4_genes = (
     set(park_loss_df.Gene.unique()).intersection(
     set(park_gain_df.Gene.unique())
 ))
-print(class_4_genes)
+print(sorted(class_4_genes))
 
 
 # In[14]:
@@ -212,7 +212,7 @@ park_gain_df.head()
 # * CNV status for sample in gene
 # * Classifier probability
 
-# In[22]:
+# In[16]:
 
 
 from scipy.special import expit
@@ -253,7 +253,7 @@ def get_info_for_gene_and_tissue(identifier, classification):
     return preds_df
 
 
-# In[23]:
+# In[17]:
 
 
 plot_id = 'CDH1_BRCA'
@@ -263,7 +263,7 @@ print(df.copy_status.isna().sum())
 df.head()
 
 
-# In[24]:
+# In[18]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -271,7 +271,7 @@ sns.violinplot(x=df.positive_prob)
 plt.title('Distribution of positive probabilities for {}'.format(plot_id))
 
 
-# In[25]:
+# In[19]:
 
 
 order = ['none', 'one', 'both']
@@ -291,7 +291,7 @@ plt.title(plot_id)
 
 # ### Averages across each "class" of genes
 
-# In[26]:
+# In[20]:
 
 
 park_df = pd.concat((park_loss_df, park_gain_df))
@@ -299,7 +299,7 @@ print(park_df.shape)
 park_df.head()
 
 
-# In[27]:
+# In[21]:
 
 
 park_info = []
@@ -319,7 +319,7 @@ print(park_info_df.shape)
 park_info_df.head()
 
 
-# In[28]:
+# In[22]:
 
 
 def id_to_class(identifier):
@@ -332,13 +332,13 @@ park_info_df['class'] = park_info_df['identifier'].apply(id_to_class)
 park_info_df.head()
 
 
-# In[29]:
+# In[23]:
 
 
 park_info_df.groupby(by=['class']).count()
 
 
-# In[30]:
+# In[24]:
 
 
 order = ['none', 'one', 'both']
@@ -356,7 +356,7 @@ plt.xticks(np.arange(3),
            ['{} (n={})'.format(l, count_map[l]) for l in order])
 
 
-# In[31]:
+# In[25]:
 
 
 sns.set({'figure.figsize': (24, 6)})
@@ -375,3 +375,49 @@ for ix, class_label in enumerate(['class 2', 'class 3', 'class 4']):
 # Looking at the box plots, we can see that in general, the samples with "both" a point mutation and a CNV in the gene of interest tend to score higher using our classifiers than samples with "one" of a point mutation or a CNV. This is despite the fact that our classifiers were trained using all of these samples ("one" or "both") as positive labels.
 # 
 # The next step is to break this down by gene - are there genes/cancer types where the functional effect of the "two hits" is clearer, or less clear? Are there genes where we see "two hits" at the genetic level but no functional effect/classifier difference, or are the sources of information basically redundant?
+
+# ### Statistical testing for individual gene/cancer type combinations
+
+# In[26]:
+
+
+import utilities as ut
+
+
+# In[27]:
+
+
+info_compare_df = ut.test_all(park_info_df)
+print(info_compare_df.shape)
+print('reject null for:', info_compare_df.reject_null.sum(), '/', info_compare_df.shape[0])
+info_compare_df.sort_values(by='corr_pval', ascending=True).head()
+
+
+# In[28]:
+
+
+# plot top three most significant
+# and top three least significant
+order = ['none', 'one', 'both']
+def get_counts(status):
+    un = np.unique(status, return_counts=True)
+    return {s: c for s, c in zip(*un)}
+
+sns.set({'figure.figsize': (24, 16)})
+fig, axarr = plt.subplots(2, 3)
+
+valid_df = info_compare_df[info_compare_df.p_value != 1.0]
+plot_ids = (
+    valid_df.sort_values(by='corr_pval', ascending=True).identifier.tolist()[:3] + 
+    valid_df.sort_values(by='corr_pval', ascending=False).identifier.tolist()[:3]
+)
+
+for ix, identifier in enumerate(plot_ids):
+    ax = axarr[ix // 3, ix % 3]
+    plot_df = park_info_df[park_info_df.identifier == identifier]
+    sns.boxplot(data=plot_df, x='status', y='positive_prob', order=order, ax=ax)
+    count_map = get_counts(plot_df.status.values)
+    ax.set_xticks(np.arange(3),
+               ['{} (n={})'.format(l, count_map[l]) for l in order])
+    ax.set_title(identifier)
+
