@@ -1,0 +1,15 @@
+name: lure_fn
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipykernel=6.6.0=py38he5a9106_0
+  - ipython=7.30.1=py38h578d9bd_0
+  - matplotlib-base=3.5.1
+  - matplotlib-venn=0.11.6
+  - numpy=1.21.4
+  - pandas=1.3.5
+  - python=3.8.0
+  - python-wget=3.2
+  - scipy=1.7.3
+  - seaborn=0.11.2
