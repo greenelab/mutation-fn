@@ -143,12 +143,12 @@ park_gain_df.head()
 # * CNV status for sample in gene
 # * Classifier probability
 
-# In[30]:
+# In[12]:
 
 
 from scipy.special import expit
 
-def get_info_for_gene_and_tissue(identifier, class_df):
+def get_info_for_gene_and_tissue(identifier, classification):
     gene, tissue = identifier.split('_')
     preds_file = park_preds_dir / 'expression_{}_raw_preds.tsv'.format(identifier)
     preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1,
@@ -162,13 +162,10 @@ def get_info_for_gene_and_tissue(identifier, class_df):
     # get mutation status for samples
     preds_df['mutation_status'] = mutation_df.loc[preds_df.index, gene]
     
-    
     # get copy status for samples
-    id_class = class_df.loc[identifier, 'classification']
-    print(id_class)
-    if id_class == 'TSG':
+    if classification == 'TSG':
         copy_status = copy_loss_df.loc[preds_df.index, gene]
-    elif id_class == 'Oncogene':
+    elif classification == 'Oncogene':
         copy_status = copy_gain_df.loc[preds_df.index, gene]
     preds_df['copy_status'] = copy_status
         
@@ -184,20 +181,26 @@ def get_info_for_gene_and_tissue(identifier, class_df):
     
     return preds_df
 
-df = get_info_for_gene_and_tissue('TP53_STAD', park_loss_df)
+
+# In[13]:
+
+
+plot_id = 'CDH1_BRCA'
+df = get_info_for_gene_and_tissue(plot_id, 'TSG')
 print(df.mutation_status.isna().sum())
 print(df.copy_status.isna().sum())
-df.head(20)
+df.head()
 
 
-# In[26]:
+# In[14]:
 
 
 sns.set({'figure.figsize': (8, 6)})
-sns.violinplot(df.positive_prob)
+sns.violinplot(x=df.positive_prob)
+plt.title('Distribution of positive probabilities for {}'.format(plot_id))
 
 
-# In[44]:
+# In[15]:
 
 
 order = ['none', 'one', 'both']
@@ -212,4 +215,88 @@ def get_counts(status):
 count_map = get_counts(df.status.values)
 plt.xticks(np.arange(3),
            ['{} (n={})'.format(l, count_map[l]) for l in order])
+plt.title(plot_id)
+
+
+# ### Averages across each "class" of genes
+
+# In[16]:
+
+
+park_df = pd.concat((park_loss_df, park_gain_df))
+print(park_df.shape)
+park_df.head()
+
+
+# In[17]:
+
+
+park_info = []
+for identifier in park_df.index:
+    try:
+        classification = park_df.loc[identifier, 'classification']
+        info_df = get_info_for_gene_and_tissue(identifier, classification)
+    except ValueError:
+        classification = park_df.loc[identifier, 'classification'].values[0]
+        info_df = get_info_for_gene_and_tissue(identifier, classification)
+    except FileNotFoundError:
+        continue
+    park_info.append(info_df)
+    
+park_info_df = pd.concat(park_info)
+print(park_info_df.shape)
+park_info_df.head()
+
+
+# In[18]:
+
+
+def id_to_class(identifier):
+    if type(park_df.loc[identifier, 'class']) == pd.Series:
+        return park_df.loc[identifier, 'class'].values[0]
+    else:
+        return park_df.loc[identifier, 'class']
+
+park_info_df['class'] = park_info_df['identifier'].apply(id_to_class)
+park_info_df.head()
+
+
+# In[19]:
+
+
+park_info_df.groupby(by=['class']).count()
+
+
+# In[20]:
+
+
+order = ['none', 'one', 'both']
+sns.set({'figure.figsize': (8, 6)})
+sns.boxplot(data=park_info_df, x='status', y='positive_prob',
+            order=order)
+plt.title('Average over all genes/cancer types from Park et al.')
+
+def get_counts(status):
+    un = np.unique(status, return_counts=True)
+    return {s: c for s, c in zip(*un)}
+
+count_map = get_counts(park_info_df.status.values)
+plt.xticks(np.arange(3),
+           ['{} (n={})'.format(l, count_map[l]) for l in order])
+
+
+# In[21]:
+
+
+sns.set({'figure.figsize': (24, 6)})
+fig, axarr = plt.subplots(1, 3)
+
+for ix, class_label in enumerate(['class 2', 'class 3', 'class 4']):
+    ax = axarr[ix]
+    plot_df = park_info_df[park_info_df['class'] == class_label]
+    sns.boxplot(data=plot_df, x='status', y='positive_prob',
+                order=order, ax=ax)
+    ax.set_title('Average over {} genes'.format(class_label))
+    count_map = get_counts(plot_df.status.values)
+    ax.set_xticks(np.arange(3), ['{} (n={})'.format(l, count_map[l]) for l in order])
 
