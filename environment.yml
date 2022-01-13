@@ -1,4 +1,4 @@
-name: lure_fn
+name: mutation_fn
 channels:
   - conda-forge
   - defaults
