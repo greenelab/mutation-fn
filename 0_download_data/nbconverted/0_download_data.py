@@ -13,6 +13,8 @@
 import pandas as pd
 from urllib.request import urlretrieve
 
+import wget
+
 import sys; sys.path.append('..')
 import config as cfg
 
@@ -75,11 +77,29 @@ print(md5_sum[0])
 assert md5_sum[0].split(' ')[0] == manifest_df.loc['mutation'].md5
 
 
+# ### Download CNV data
+# 
+# We download the same copy number data used in the [pancancer classifiers](https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/download_data.sh#L33).
+# 
+# These CNV calls have been thresholded using GISTIC, and the output includes 5 values: [-2, -1, 0, 1, 2], which correspond to "deep loss", "moderate loss", "no change", "moderate gain", and "deep gain", respectively.
+
+# In[7]:
+
+
+copy_url = 'https://ndownloader.figshare.com/files/11095412'
+copy_filename = '../data/pancan_GISTIC_threshold.tsv'
+
+if not mutation_filepath.is_file():
+    wget.download(copy_url, out=copy_filename)
+else:
+    print('Downloaded data file already exists, skipping download')
+
+
 # ### Download gene set from Park et al. paper
 # 
 # We want to download the set of genes analyzed in [Park et al. 2021](https://www.nature.com/articles/s41467-021-27242-3). We are particularly interested in the "Class 2/3/4" genes from Figure 1, which are inferred to be "two-hit" genes where non-synonymous mutations and CNVs tend to co-occur more often than would be expected by chance.
 
-# In[7]:
+# In[8]:
 
 
 import pandas as pd
@@ -92,7 +112,7 @@ print(park_df.shape)
 park_df.head()
 
 
-# In[8]:
+# In[9]:
 
 
 # the paper uses an FDR threshold of 0.1, so we do the same here
@@ -108,14 +128,14 @@ print(park_loss_df.Gene.unique())
 park_loss_df.head()
 
 
-# In[9]:
+# In[10]:
 
 
 park_gain_df = (park_df
   .loc[park_df['FDR.1'] < fdr_threshold, :]
   .iloc[:, 9:]
 )
-park_gain_df.columns = park_gain_df.columns.str.replace('.1', '')
+park_gain_df.columns = park_gain_df.columns.str.replace('.1', '', regex=False)
 park_gain_df.set_index('Pair', inplace=True)
 print(park_gain_df.shape)
 print(park_gain_df.Gene.unique())
@@ -124,14 +144,14 @@ park_gain_df.head()
 
 # ### Download oncogene/tumor suppressor information for Park et al. genes
 
-# In[10]:
+# In[11]:
 
 
 # downloaded from https://www.sciencedirect.com/science/article/pii/S009286741830237X
 # oncogene/TSG predictions for genes/cancer types using 20/20+ classifier
 class_df = pd.read_excel(
     cfg.data_dir / '1-s2.0-S009286741830237X-mmc1.xlsx', 
-    sheet_name='Table S1', index_col='KEY', header=2
+    sheet_name='Table S1', index_col='KEY', header=3
 )
 class_df.rename(columns={'Tumor suppressor or oncogene prediction (by 20/20+)':
                          'classification'},
@@ -140,7 +160,7 @@ class_df.rename(columns={'Tumor suppressor or oncogene prediction (by 20/20+)':
 class_df.head()
 
 
-# In[11]:
+# In[12]:
 
 
 loss_class_df = (park_loss_df
@@ -158,7 +178,7 @@ print(loss_class_df.classification.unique())
 loss_class_df.head()
 
 
-# In[12]:
+# In[13]:
 
 
 gain_class_df = (park_gain_df
@@ -176,7 +196,7 @@ print(gain_class_df.classification.unique())
 gain_class_df.head()
 
 
-# In[13]:
+# In[14]:
 
 
 loss_class_df.to_csv(cfg.data_dir / 'park_loss_df.tsv', sep='\t')
