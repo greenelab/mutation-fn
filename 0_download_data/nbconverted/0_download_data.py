@@ -87,7 +87,7 @@ assert md5_sum[0].split(' ')[0] == manifest_df.loc['mutation'].md5
 
 
 copy_url = 'https://ndownloader.figshare.com/files/11095412'
-copy_filename = '../data/pancan_GISTIC_threshold.tsv'
+copy_filename = cfg.data_dir / 'pancan_GISTIC_threshold.tsv'
 
 if not mutation_filepath.is_file():
     wget.download(copy_url, out=copy_filename)

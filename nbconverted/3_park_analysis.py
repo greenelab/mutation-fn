@@ -3,7 +3,9 @@
 
 # ## Re-analysis of Park et al. findings using gene expression-based mutation signatures
 # 
-# TODO: document
+# In [Park et al. 2021](https://www.nature.com/articles/s41467-021-27242-3), the authors study interactions between point mutations and CNVs in TCGA data. Essentially, they do an overrepresentation analysis to identify genes/cancer types that have more samples with _both_ a point mutation and a CNV than expected by chance, implying that these genes tend to require "two hits" (the point mutation and the CNV in this case) to be activated (oncogenes) or inactivated (tumor suppressors).
+# 
+# Here, we want to take the genes/cancer types they identified, and analyze the functional effects in the context of our mutation prediction classifiers. Our hypothesis is that in the "two-hit" genes, samples with "two hits" (a point mutation and a CNV) will have a higher predicted mutation probability than samples with zero or one hit.
 
 # In[1]:
 
@@ -72,13 +74,12 @@ mutation_df.iloc[:5, :5]
 
 # ### Load copy number info
 # 
-# TODO: document
+# Get copy loss/gain info directly from GISTIC "thresholded" output. This should be the same as (or very similar to) what the Park et al. study uses.
 
 # In[7]:
 
 
-# get copy loss/gain info directly from GISTIC output
-# we use the preprocessing code here:
+# we use the data source and preprocessing code from the pancancer repo, here:
 # https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/process_copynumber.py#L21
 
 copy_thresh_df = (
@@ -156,7 +157,7 @@ copy_gain_df.iloc[:5, :5]
 
 # ### Classify genes/cancer types into "classes"
 # 
-# In [Park et al. 2021](https://www.nature.com/articles/s41467-021-27242-3), they describe 4 "classes" of driver genes:
+# In [the Park et al. paper](https://www.nature.com/articles/s41467-021-27242-3#Sec4), they describe 4 "classes" of driver genes:
 # 
 # 1. Genes that function exclusively as one-hit drivers, no significant co-occurrence with CNAs (we aren't concerned with those here)
 # 2. Genes that interact with CNA loss in at least one cancer type - "two-hit loss" drivers (i.e. classical tumor suppressors)
@@ -370,3 +371,7 @@ for ix, class_label in enumerate(['class 2', 'class 3', 'class 4']):
     count_map = get_counts(plot_df.status.values)
     ax.set_xticks(np.arange(3), ['{} (n={})'.format(l, count_map[l]) for l in order])
 
+
+# Looking at the box plots, we can see that in general, the samples with "both" a point mutation and a CNV in the gene of interest tend to score higher using our classifiers than samples with "one" of a point mutation or a CNV. This is despite the fact that our classifiers were trained using all of these samples ("one" or "both") as positive labels.
+# 
+# The next step is to break this down by gene - are there genes/cancer types where the functional effect of the "two hits" is clearer, or less clear? Are there genes where we see "two hits" at the genetic level but no functional effect/classifier difference, or are the sources of information basically redundant?
