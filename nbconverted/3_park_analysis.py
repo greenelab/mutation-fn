@@ -37,7 +37,7 @@ park_preds_dir = cfg.data_dir / 'park_genes_preds'
 pancancer_pickle = Path('/home/jake/research/mpmp/data/pancancer_data.pkl')
 
 
-# ### Load mutation/copy number info
+# ### Load mutation info
 # 
 # For now, just use binary mutation status from the pancancer repo. In the future we could pull more granular info from MC3, but it would take some engineering of `1_get_mutation_counts` to do this for lots of genes.
 
@@ -70,18 +70,86 @@ print(mutation_df.shape)
 mutation_df.iloc[:5, :5]
 
 
+# ### Load copy number info
+# 
+# TODO: document
+
 # In[7]:
 
 
-copy_loss_df = pancancer_data[2]
-print(copy_loss_df.shape)
-copy_loss_df.iloc[:5, :5]
+# get copy loss/gain info directly from GISTIC output
+# we use the preprocessing code here:
+# https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/process_copynumber.py#L21
+
+copy_thresh_df = (
+    pd.read_csv(Path('data', 'pancan_GISTIC_threshold.tsv'),
+                sep='\t', index_col=0)
+      .drop(columns=['Locus ID', 'Cytoband'])
+)
+copy_thresh_df.columns = copy_thresh_df.columns.str[0:15]
+
+print(copy_thresh_df.shape)
+copy_thresh_df.iloc[:5, :5]
 
 
 # In[8]:
 
 
-copy_gain_df = pancancer_data[3]
+sample_freeze_df = pancancer_data[0]
+copy_samples = list(
+    set(sample_freeze_df.SAMPLE_BARCODE)
+    .intersection(set(copy_thresh_df.columns))
+)
+print(len(copy_samples))
+
+
+# In[9]:
+
+
+# make sure we're not losing too many samples, a few is fine
+print(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns))
+
+
+# In[10]:
+
+
+copy_thresh_df = (copy_thresh_df
+    .T
+    .loc[sorted(copy_samples)]
+    .fillna(0)
+    .astype(int)
+)
+
+print(copy_thresh_df.shape)
+copy_thresh_df.iloc[:5, :5]
+
+
+# In[11]:
+
+
+# thresholded copy number includes 5 values [-2, -1, 0, 1, 2], which
+# correspond to "deep loss", "moderate loss", "no change",
+# "moderate gain", and "deep gain", respectively.
+#
+# here, we want to use "moderate" and "deep" loss/gain to define CNV
+# loss/gain, as opposed to the more conservative approach of using
+# "deep loss/gain" as in our classifiers
+
+copy_loss_df = (copy_thresh_df
+    .replace(to_replace=[1, 2], value=0)
+    .replace(to_replace=[-1, -2], value=1)
+)
+print(copy_loss_df.shape)
+copy_loss_df.iloc[:5, :5]
+
+
+# In[12]:
+
+
+copy_gain_df = (copy_thresh_df
+    .replace(to_replace=[-1, -2], value=0)
+    .replace(to_replace=[1, 2], value=1)
+)
 print(copy_gain_df.shape)
 copy_gain_df.iloc[:5, :5]
 
@@ -97,7 +165,7 @@ copy_gain_df.iloc[:5, :5]
 # 
 # Here, we label each of the genes from the Park et al. data with their "class", since we want to segment our analyses in this way too.
 
-# In[9]:
+# In[13]:
 
 
 # our datasets are already filtered for significance, so genes that appear
@@ -111,7 +179,7 @@ class_4_genes = (
 print(class_4_genes)
 
 
-# In[10]:
+# In[14]:
 
 
 def gene_to_class(g):
@@ -123,7 +191,7 @@ park_loss_df['class'] = park_loss_df.Gene.map(loss_class)
 park_loss_df.head()
 
 
-# In[11]:
+# In[15]:
 
 
 def gene_to_class(g):
@@ -143,7 +211,7 @@ park_gain_df.head()
 # * CNV status for sample in gene
 # * Classifier probability
 
-# In[12]:
+# In[22]:
 
 
 from scipy.special import expit
@@ -164,9 +232,11 @@ def get_info_for_gene_and_tissue(identifier, classification):
     
     # get copy status for samples
     if classification == 'TSG':
-        copy_status = copy_loss_df.loc[preds_df.index, gene]
+        samples = preds_df.index.intersection(copy_loss_df.index)
+        copy_status = copy_loss_df.loc[samples, gene]
     elif classification == 'Oncogene':
-        copy_status = copy_gain_df.loc[preds_df.index, gene]
+        samples = preds_df.index.intersection(copy_gain_df.index)
+        copy_status = copy_gain_df.loc[samples, gene]
     preds_df['copy_status'] = copy_status
         
     def status_from_mut_info(row):
@@ -182,7 +252,7 @@ def get_info_for_gene_and_tissue(identifier, classification):
     return preds_df
 
 
-# In[13]:
+# In[23]:
 
 
 plot_id = 'CDH1_BRCA'
@@ -192,7 +262,7 @@ print(df.copy_status.isna().sum())
 df.head()
 
 
-# In[14]:
+# In[24]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -200,7 +270,7 @@ sns.violinplot(x=df.positive_prob)
 plt.title('Distribution of positive probabilities for {}'.format(plot_id))
 
 
-# In[15]:
+# In[25]:
 
 
 order = ['none', 'one', 'both']
@@ -220,7 +290,7 @@ plt.title(plot_id)
 
 # ### Averages across each "class" of genes
 
-# In[16]:
+# In[26]:
 
 
 park_df = pd.concat((park_loss_df, park_gain_df))
@@ -228,7 +298,7 @@ print(park_df.shape)
 park_df.head()
 
 
-# In[17]:
+# In[27]:
 
 
 park_info = []
@@ -248,7 +318,7 @@ print(park_info_df.shape)
 park_info_df.head()
 
 
-# In[18]:
+# In[28]:
 
 
 def id_to_class(identifier):
@@ -261,13 +331,13 @@ park_info_df['class'] = park_info_df['identifier'].apply(id_to_class)
 park_info_df.head()
 
 
-# In[19]:
+# In[29]:
 
 
 park_info_df.groupby(by=['class']).count()
 
 
-# In[20]:
+# In[30]:
 
 
 order = ['none', 'one', 'both']
@@ -285,7 +355,7 @@ plt.xticks(np.arange(3),
            ['{} (n={})'.format(l, count_map[l]) for l in order])
 
 
-# In[21]:
+# In[31]:
 
 
 sns.set({'figure.figsize': (24, 6)})
