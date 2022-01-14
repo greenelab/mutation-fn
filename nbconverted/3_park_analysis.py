@@ -32,8 +32,13 @@ get_ipython().run_line_magic('autoreload', '2')
 park_loss_data = cfg.data_dir / 'park_loss_df.tsv'
 park_gain_data = cfg.data_dir / 'park_gain_df.tsv'
 
+# park significant gene info
+park_loss_sig_data = cfg.data_dir / 'park_loss_df_sig_only.tsv'
+park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
+
 # park gene/cancer type predictions
-park_preds_dir = cfg.data_dir / 'park_genes_preds'
+# park_preds_dir = cfg.data_dir / 'park_genes_preds'
+park_preds_dir = cfg.data_dir / 'park_genes_all_preds'
 
 # mutation and copy number data
 pancancer_pickle = Path('/home/jake/research/mpmp/data/pancancer_data.pkl')
@@ -159,7 +164,7 @@ copy_gain_df.iloc[:5, :5]
 # 
 # In [the Park et al. paper](https://www.nature.com/articles/s41467-021-27242-3#Sec4), they describe 4 "classes" of driver genes:
 # 
-# 1. Genes that function exclusively as one-hit drivers, no significant co-occurrence with CNAs (we aren't concerned with those here)
+# 1. Genes that function exclusively as one-hit drivers, no significant co-occurrence with CNAs
 # 2. Genes that interact with CNA loss in at least one cancer type - "two-hit loss" drivers (i.e. classical tumor suppressors)
 # 3. Genes that interact with CNA gain in at least one cancer type - "two-hit gain" drivers (for some examples/explanation of "two-hit" oncogenes, see [this paper](https://www.nature.com/articles/s41586-020-2175-2))
 # 4. Genes that interact with both CNA loss and CNA gain across multiple cancer types - "two-hit loss and gain" drivers
@@ -169,38 +174,59 @@ copy_gain_df.iloc[:5, :5]
 # In[13]:
 
 
-# our datasets are already filtered for significance, so genes that appear
-# in both loss/gain tables are class 4
-# others are class 2/3 for loss/gain tables respectively
+# TODO: document
 
-class_4_genes = (
-    set(park_loss_df.Gene.unique()).intersection(
-    set(park_gain_df.Gene.unique())
+park_loss_sig_df = pd.read_csv(park_loss_sig_data, sep='\t', index_col=0)
+park_gain_sig_df = pd.read_csv(park_gain_sig_data, sep='\t', index_col=0)
+
+class_4_ids = (
+    set(park_loss_sig_df.index.unique()).intersection(
+    set(park_gain_sig_df.index.unique())
 ))
-print(sorted(class_4_genes))
+
+class_2_ids = set(park_loss_sig_df.index.unique()) - class_4_ids
+class_3_ids = set(park_gain_sig_df.index.unique()) - class_4_ids
+
+class_1_ids = (
+    set(park_loss_df.index.unique()) - (
+        class_4_ids.union(class_2_ids, class_3_ids)
+    )
+)
+print(len(park_loss_df.index.unique()))
+print('class 1:', len(class_1_ids))
+print('class 2:', len(class_2_ids))
+print('class 3:', len(class_3_ids))
+print('class 4:', len(class_4_ids))
+print(sorted(class_4_ids))
 
 
 # In[14]:
 
 
-def gene_to_class(g):
-    return 'class 4' if g in class_4_genes else 'class 2'
+def id_to_class(i):
+    if i in class_2_ids:
+        return 'class 2'
+    elif i in class_3_ids:
+        return 'class 3'
+    elif i in class_4_ids:
+        return 'class 4'
+    else:
+        return 'class 1'
 
-loss_class = {g: gene_to_class(g) for g in park_loss_df.Gene.unique()}
+loss_class = {i: id_to_class(i) for i in park_loss_df.index.unique()}
 
-park_loss_df['class'] = park_loss_df.Gene.map(loss_class)
+park_loss_df['class'] = park_loss_df.index.map(loss_class)
+print(park_loss_df['class'].unique())
 park_loss_df.head()
 
 
 # In[15]:
 
 
-def gene_to_class(g):
-    return 'class 4' if g in class_4_genes else 'class 3'
+gain_class = {i: id_to_class(i) for i in park_gain_df.index.unique()}
 
-gain_class = {g: gene_to_class(g) for g in park_gain_df.Gene.unique()}
-
-park_gain_df['class'] = park_gain_df.Gene.map(gain_class)
+park_gain_df['class'] = park_gain_df.index.map(gain_class)
+print(park_gain_df['class'].unique())
 park_gain_df.head()
 
 
@@ -355,11 +381,11 @@ plt.xticks(np.arange(3),
 # In[25]:
 
 
-sns.set({'figure.figsize': (24, 6)})
-fig, axarr = plt.subplots(1, 3)
+sns.set({'figure.figsize': (18, 12)})
+fig, axarr = plt.subplots(2, 2)
 
-for ix, class_label in enumerate(['class 2', 'class 3', 'class 4']):
-    ax = axarr[ix]
+for ix, class_label in enumerate(['class 1', 'class 2', 'class 3', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
     plot_df = park_info_df[park_info_df['class'] == class_label]
     sns.boxplot(data=plot_df, x='status', y='positive_prob',
                 order=order, ax=ax)
@@ -429,6 +455,7 @@ pair_df = (info_compare_df
                      'FDR': 'park_pval'})
 )
 print(pair_df.shape)
+print(pair_df['class'].unique())
 print(pair_df.classifier_pval.isna().sum())
 pair_df.head()
 
@@ -436,10 +463,15 @@ pair_df.head()
 # In[30]:
 
 
-# these are the "class 4" genes, they have 2 park p-values (one for
-# copy gain and one for copy loss)
-# for now we'll just keep these and plot both p-values
-pair_df[pair_df.identifier.duplicated(keep=False)].head()
+class_order = ['class 1', 'class 2', 'class 3', 'class 4']
+sns.set({'figure.figsize': (8, 6)})
+sns.scatterplot(data=pair_df, x='classifier_pval', y='park_pval',
+                hue='class', hue_order=class_order)
+plt.xlim(-0.1, 1.1)
+plt.ylim(-0.1, 1.1)
+plt.xlabel('Classifier p-value')
+plt.ylabel('Park et al. p-value')
+plt.title('Classifier vs. Park p-value, all Park genes')
 
 
 # In[31]:
@@ -447,12 +479,12 @@ pair_df[pair_df.identifier.duplicated(keep=False)].head()
 
 sns.set({'figure.figsize': (8, 6)})
 sns.scatterplot(data=pair_df, x='classifier_pval', y='park_pval',
-                hue='class', hue_order=['class 2', 'class 3', 'class 4'])
+                hue='class', hue_order=class_order)
 plt.xscale('log')
 plt.yscale('log')
 plt.xlim(10**-10, 10**0+1)
-plt.xlim(10**-10, 10**0+1)
+plt.ylim(10**-10, 10**0+1)
 plt.xlabel('Classifier p-value')
 plt.ylabel('Park et al. p-value')
-plt.title('Classifier vs. Park p-value, significant Park genes')
+plt.title('Classifier vs. Park p-value, all Park genes')
 
