@@ -347,10 +347,6 @@ sns.boxplot(data=park_info_df, x='status', y='positive_prob',
             order=order)
 plt.title('Average over all genes/cancer types from Park et al.')
 
-def get_counts(status):
-    un = np.unique(status, return_counts=True)
-    return {s: c for s, c in zip(*un)}
-
 count_map = get_counts(park_info_df.status.values)
 plt.xticks(np.arange(3),
            ['{} (n={})'.format(l, count_map[l]) for l in order])
@@ -420,4 +416,43 @@ for ix, identifier in enumerate(plot_ids):
     ax.set_xticks(np.arange(3),
                ['{} (n={})'.format(l, count_map[l]) for l in order])
     ax.set_title(identifier)
+
+
+# ### Compare classifier-based statistical testing vs. Park et al statistical testing
+
+# In[29]:
+
+
+pair_df = (info_compare_df
+    .merge(park_df, left_on='identifier', right_index=True)
+    .rename(columns={'corr_pval': 'classifier_pval',
+                     'FDR': 'park_pval'})
+)
+print(pair_df.shape)
+print(pair_df.classifier_pval.isna().sum())
+pair_df.head()
+
+
+# In[30]:
+
+
+# these are the "class 4" genes, they have 2 park p-values (one for
+# copy gain and one for copy loss)
+# for now we'll just keep these and plot both p-values
+pair_df[pair_df.identifier.duplicated(keep=False)].head()
+
+
+# In[31]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+sns.scatterplot(data=pair_df, x='classifier_pval', y='park_pval',
+                hue='class', hue_order=['class 2', 'class 3', 'class 4'])
+plt.xscale('log')
+plt.yscale('log')
+plt.xlim(10**-10, 10**0+1)
+plt.xlim(10**-10, 10**0+1)
+plt.xlabel('Classifier p-value')
+plt.ylabel('Park et al. p-value')
+plt.title('Classifier vs. Park p-value, significant Park genes')
 
