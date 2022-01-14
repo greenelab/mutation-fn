@@ -115,30 +115,18 @@ park_df.head()
 # In[9]:
 
 
-# the paper uses an FDR threshold of 0.1, so we do the same here
-fdr_threshold = 0.1
-
-park_loss_df = (park_df
-  .loc[park_df.FDR < fdr_threshold, :]
-  .iloc[:, :8]
-  .set_index('Pair')
-)
+park_loss_df = park_df.iloc[:, :8].set_index('Pair')
 print(park_loss_df.shape)
-print(park_loss_df.Gene.unique())
 park_loss_df.head()
 
 
 # In[10]:
 
 
-park_gain_df = (park_df
-  .loc[park_df['FDR.1'] < fdr_threshold, :]
-  .iloc[:, 9:]
-)
+park_gain_df = park_df.iloc[:, 9:]
 park_gain_df.columns = park_gain_df.columns.str.replace('.1', '', regex=False)
 park_gain_df.set_index('Pair', inplace=True)
 print(park_gain_df.shape)
-print(park_gain_df.Gene.unique())
 park_gain_df.head()
 
 
