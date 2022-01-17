@@ -93,3 +93,5 @@ plt.title('Park/Vogelstein gene set overlap')
 print(len(park_gain_genes - vogelstein_genes))
 print(sorted(park_gain_genes - vogelstein_genes))
 
+
+# This is just a quick check to see how many new classifiers we have to train. In general, most of the "hits" that are identified in the Park et al. paper are in the Vogelstein dataset, but there are a few that aren't so we'll have to train classifiers for those genes/cancer types. This is about what we expected.
