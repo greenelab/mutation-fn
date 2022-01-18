@@ -72,6 +72,8 @@ with open(pancancer_pickle, 'rb') as f:
 # In[6]:
 
 
+# get (binary) mutation data
+# 1 = observed non-silent mutation in this gene for this sample, 0 otherwise
 mutation_df = pancancer_data[1]
 print(mutation_df.shape)
 mutation_df.iloc[:5, :5]
@@ -94,6 +96,9 @@ copy_thresh_df = (
 )
 copy_thresh_df.columns = copy_thresh_df.columns.str[0:15]
 
+# thresholded copy number includes 5 values [-2, -1, 0, 1, 2], which
+# correspond to "deep loss", "moderate loss", "no change",
+# "moderate gain", and "deep gain", respectively.
 print(copy_thresh_df.shape)
 copy_thresh_df.iloc[:5, :5]
 
@@ -133,13 +138,11 @@ copy_thresh_df.iloc[:5, :5]
 # In[11]:
 
 
-# thresholded copy number includes 5 values [-2, -1, 0, 1, 2], which
-# correspond to "deep loss", "moderate loss", "no change",
-# "moderate gain", and "deep gain", respectively.
-#
 # here, we want to use "moderate" and "deep" loss/gain to define CNV
-# loss/gain, as opposed to the more conservative approach of using
-# "deep loss/gain" as in our classifiers
+# loss/gain (to match Park et al.)
+#
+# note that this is different to the more conservative approach of using
+# "deep loss/gain" only as in our classifiers
 
 copy_loss_df = (copy_thresh_df
     .replace(to_replace=[1, 2], value=0)
@@ -159,6 +162,10 @@ copy_gain_df = (copy_thresh_df
 print(copy_gain_df.shape)
 copy_gain_df.iloc[:5, :5]
 
+
+# At this point, the copy number data should be binary - in the copy gain data, each sample either has a copy number amplification or not in each gene, and in the copy loss data, each sample either has a copy number loss or not in each gene.
+# 
+# Some samples seem to have copy number changes in almost every gene. This could actually be the case for some tumors, e.g. due to widespread chromosomal instability, but we'll take a look at this in the future.
 
 # ### Classify genes/cancer types into "classes"
 # 
@@ -232,11 +239,13 @@ park_gain_df.head()
 
 # ### Retrieve and format per-sample information
 # 
-# * Sample ID, gene/tissue (multi-index)
-# * Gene classification
-# * Mutation status for sample in gene
-# * CNV status for sample in gene
-# * Classifier probability
+# We want to generate a dataframe with the following information:
+# 
+# * Sample ID, gene/tissue
+# * Gene classification (oncogene/TSG)
+# * Mutation status (binary) for sample in gene
+# * CNV status (binary) for sample in gene, gain/loss for oncogene/TSG respectively
+# * Predicted probability of mutation/CNV from our gene expression classifier for the given gene/tissue
 
 # In[16]:
 
@@ -244,6 +253,13 @@ park_gain_df.head()
 from scipy.special import expit
 
 def get_info_for_gene_and_tissue(identifier, classification):
+    """Given a gene and tissue, load the relevant classifier results and
+    mutation information, and return a dataframe.
+    
+    'status' is what we will segment our plots by: 'none' == neither a point
+    mutation or CNV observed for the given sample, 'one' == either a point
+    mutation or CNV but not both, 'both' == both point mutation and CNV
+    """
     gene, tissue = identifier.split('_')
     preds_file = park_preds_dir / 'expression_{}_raw_preds.tsv'.format(identifier)
     preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1,
