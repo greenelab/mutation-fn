@@ -7,7 +7,7 @@
 # 
 # Here, we want to take the genes/cancer types they identified, and analyze the functional effects in the context of our mutation prediction classifiers. Our hypothesis is that in the "two-hit" genes, samples with "two hits" (a point mutation and a CNV) will have a higher predicted mutation probability than samples with zero or one hit.
 
-# In[1]:
+# In[32]:
 
 
 from pathlib import Path
@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 
 import sys; sys.path.append('..')
 import config as cfg
+import utilities as ut
 
 get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
@@ -419,7 +420,7 @@ for ix, class_label in enumerate(['class 1', 'class 2', 'class 3', 'class 4']):
 # In[26]:
 
 
-import utilities as ut
+
 
 
 # In[27]:
@@ -503,4 +504,95 @@ plt.ylim(10**-10, 10**0+1)
 plt.xlabel('Classifier p-value')
 plt.ylabel('Park et al. p-value')
 plt.title('Classifier vs. Park p-value, all Park genes')
+
+
+# ### Get classifier performance info
+
+# In[68]:
+
+
+class_sig_df = ut.get_classifier_significance(pair_df.identifier.unique().tolist(),
+                                              '/home/jake/research/mpmp/data/vogelstein_preds/park_genes_all/')
+print(class_sig_df.shape)
+print('Significant classifiers:', class_sig_df.reject_null.sum(), '/', class_sig_df.shape[0])
+class_sig_df.head(10)
+
+
+# In[74]:
+
+
+new_pair_df = pair_df.merge(
+    class_sig_df.loc[:, ['identifier', 'reject_null']],
+    left_on='identifier', right_on='identifier'
+)
+new_pair_df.rename(columns={
+    'reject_null_x': 'reject_null_classifier',
+    'reject_null_y': 'reject_null_class2'
+}, inplace=True)
+new_pair_df['reject_null_park'] = (new_pair_df.park_pval < 0.05)
+new_pair_df.head()
+
+
+# In[75]:
+
+
+class_order = ['class 1', 'class 2', 'class 3', 'class 4']
+sns.set({'figure.figsize': (8, 6)})
+sns.scatterplot(data=new_pair_df[new_pair_df.reject_null_class2],
+                x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
+plt.xlim(-0.1, 1.1)
+plt.ylim(-0.1, 1.1)
+plt.xlabel('Classifier p-value')
+plt.ylabel('Park et al. p-value')
+plt.title('Classifier vs. Park p-value, good classifiers')
+
+
+# In[78]:
+
+
+class_order = ['class 1', 'class 2', 'class 3', 'class 4']
+sns.set({'figure.figsize': (8, 6)})
+sns.scatterplot(data=new_pair_df[((new_pair_df.reject_null_park) |
+                                 (new_pair_df.reject_null_classifier)) &
+                                 (new_pair_df.reject_null_class2)],
+                x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
+plt.xscale('log')
+plt.yscale('log')
+plt.xlim(10**-10, 10**0+1)
+plt.ylim(10**-10, 10**0+1)
+plt.xlabel('Classifier p-value')
+plt.ylabel('Park et al. p-value')
+plt.title('Classifier vs. Park p-value, all Park genes')
+
+
+# In[90]:
+
+
+heatmap_df = (new_pair_df
+    .loc[:, ['reject_null_classifier', 'reject_null_park']]
+    .copy()
+    .value_counts()
+    .reset_index()
+    .pivot(index='reject_null_classifier', columns='reject_null_park')
+)
+sns.heatmap(heatmap_df)
+
+
+# In[91]:
+
+
+heatmap_df = (new_pair_df
+    .loc[new_pair_df.reject_null_class2, ['reject_null_classifier', 'reject_null_park']]
+    .copy()
+    .value_counts()
+    .reset_index()
+    .pivot(index='reject_null_classifier', columns='reject_null_park')
+)
+sns.heatmap(heatmap_df)
+
+
+# In[ ]:
+
+
+
 
