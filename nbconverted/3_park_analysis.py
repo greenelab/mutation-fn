@@ -7,7 +7,7 @@
 # 
 # Here, we want to take the genes/cancer types they identified, and analyze the functional effects in the context of our mutation prediction classifiers. Our hypothesis is that in the "two-hit" genes, samples with "two hits" (a point mutation and a CNV) will have a higher predicted mutation probability than samples with zero or one hit.
 
-# In[32]:
+# In[1]:
 
 
 from pathlib import Path
@@ -29,16 +29,15 @@ get_ipython().run_line_magic('autoreload', '2')
 # In[2]:
 
 
-# park geneset info
+# park et al. geneset info
 park_loss_data = cfg.data_dir / 'park_loss_df.tsv'
 park_gain_data = cfg.data_dir / 'park_gain_df.tsv'
 
-# park significant gene info
+# park et al. significant gene info
 park_loss_sig_data = cfg.data_dir / 'park_loss_df_sig_only.tsv'
 park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
 
-# park gene/cancer type predictions
-# park_preds_dir = cfg.data_dir / 'park_genes_preds'
+# park et al. gene/cancer type predictions
 park_preds_dir = cfg.data_dir / 'park_genes_all_preds'
 
 # mutation and copy number data
@@ -262,7 +261,7 @@ def get_info_for_gene_and_tissue(identifier, classification):
     mutation or CNV but not both, 'both' == both point mutation and CNV
     """
     gene, tissue = identifier.split('_')
-    preds_file = park_preds_dir / 'expression_{}_raw_preds.tsv'.format(identifier)
+    preds_file = park_preds_dir / '{}_expression_False_raw_preds.tsv'.format(identifier)
     preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1,
                            names=['sample_id', gene])
     
@@ -420,19 +419,13 @@ for ix, class_label in enumerate(['class 1', 'class 2', 'class 3', 'class 4']):
 # In[26]:
 
 
-
-
-
-# In[27]:
-
-
 info_compare_df = ut.test_all(park_info_df)
 print(info_compare_df.shape)
 print('reject null for:', info_compare_df.reject_null.sum(), '/', info_compare_df.shape[0])
 info_compare_df.sort_values(by='corr_pval', ascending=True).head()
 
 
-# In[28]:
+# In[27]:
 
 
 # plot top three most significant
@@ -463,7 +456,7 @@ for ix, identifier in enumerate(plot_ids):
 
 # ### Compare classifier-based statistical testing vs. Park et al statistical testing
 
-# In[29]:
+# In[28]:
 
 
 pair_df = (info_compare_df
@@ -477,7 +470,7 @@ print(pair_df.classifier_pval.isna().sum())
 pair_df.head()
 
 
-# In[30]:
+# In[29]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
@@ -491,7 +484,7 @@ plt.ylabel('Park et al. p-value')
 plt.title('Classifier vs. Park p-value, all Park genes')
 
 
-# In[31]:
+# In[30]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -507,18 +500,28 @@ plt.title('Classifier vs. Park p-value, all Park genes')
 
 
 # ### Get classifier performance info
+# 
+# We also want to evaluate the classifiers themselves, to see which ones perform significantly better than with shuffled labels (similar to what we did in [the mpmp paper](https://greenelab.github.io/mpmp-manuscript/#evaluating-mutation-prediction-classifiers)). This will give us 3 different p-values:
+# 
+# * "Classifier performance p-value": a p-value for the t-test comparing performance of the classifier at predicting mutation presence/absence, vs shuffled baseline
+# * "Park p-value": the p-value from Park et al. for mutation/CNV co-occurrence
+# * "Classifier 'both' p-value": the p-value from a t-test comparing classifier predictions with 'one' of a mutation or CNV with 'both' a mutation and a CNV
+# 
+# We'll mostly use the first one (performance p-value) to filter to the genes/cancer types where classification works well, since our results don't mean much if we can't accurately distinguish between mutated and non-mutated samples.
+# 
+# The latter two p-values are both ways to quantify "two-hit-ness", or the degree to which the gene behaves as a "two-hit" driver in the relevant cancer type. We want to see to what extent the measurements agree, *conditional on* good classifier performance.
 
-# In[68]:
+# In[31]:
 
 
-class_sig_df = ut.get_classifier_significance(pair_df.identifier.unique().tolist(),
-                                              '/home/jake/research/mpmp/data/vogelstein_preds/park_genes_all/')
+class_sig_df = ut.get_classifier_significance(pair_df.identifier.unique().tolist(), park_preds_dir)
+                                              # '/home/jake/research/mpmp/data/vogelstein_preds/park_genes_old/')
 print(class_sig_df.shape)
 print('Significant classifiers:', class_sig_df.reject_null.sum(), '/', class_sig_df.shape[0])
 class_sig_df.head(10)
 
 
-# In[74]:
+# In[32]:
 
 
 new_pair_df = pair_df.merge(
@@ -526,35 +529,35 @@ new_pair_df = pair_df.merge(
     left_on='identifier', right_on='identifier'
 )
 new_pair_df.rename(columns={
-    'reject_null_x': 'reject_null_classifier',
-    'reject_null_y': 'reject_null_class2'
+    'reject_null_x': 'reject_null_class_both',
+    'reject_null_y': 'reject_null_class_perf'
 }, inplace=True)
 new_pair_df['reject_null_park'] = (new_pair_df.park_pval < 0.05)
 new_pair_df.head()
 
 
-# In[75]:
+# In[33]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
 sns.set({'figure.figsize': (8, 6)})
-sns.scatterplot(data=new_pair_df[new_pair_df.reject_null_class2],
+sns.scatterplot(data=new_pair_df[new_pair_df.reject_null_class_perf],
                 x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
 plt.xlim(-0.1, 1.1)
 plt.ylim(-0.1, 1.1)
 plt.xlabel('Classifier p-value')
 plt.ylabel('Park et al. p-value')
-plt.title('Classifier vs. Park p-value, good classifiers')
+plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
-# In[78]:
+# In[34]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
 sns.set({'figure.figsize': (8, 6)})
 sns.scatterplot(data=new_pair_df[((new_pair_df.reject_null_park) |
-                                 (new_pair_df.reject_null_classifier)) &
-                                 (new_pair_df.reject_null_class2)],
+                                 (new_pair_df.reject_null_class_both)) &
+                                 (new_pair_df.reject_null_class_perf)],
                 x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
 plt.xscale('log')
 plt.yscale('log')
@@ -562,37 +565,129 @@ plt.xlim(10**-10, 10**0+1)
 plt.ylim(10**-10, 10**0+1)
 plt.xlabel('Classifier p-value')
 plt.ylabel('Park et al. p-value')
-plt.title('Classifier vs. Park p-value, all Park genes')
+plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
-# In[90]:
+# In[35]:
 
+
+sns.set({'figure.figsize': (12, 4)})
+fig, axarr = plt.subplots(1, 2, sharey=True)
 
 heatmap_df = (new_pair_df
-    .loc[:, ['reject_null_classifier', 'reject_null_park']]
+    .loc[:, ['reject_null_class_both', 'reject_null_park']]
     .copy()
     .value_counts()
     .reset_index()
-    .pivot(index='reject_null_classifier', columns='reject_null_park')
+    .pivot(index='reject_null_class_both', columns='reject_null_park')
 )
-sns.heatmap(heatmap_df)
-
-
-# In[91]:
-
-
+vmax = heatmap_df.max().max()
+heatmap_df.head()
+sns.heatmap(heatmap_df, annot=True, fmt='d', cbar=False, ax=axarr[0])
+axarr[0].set_xlabel(r'Park et al. significant at $\alpha=0.05$')
+axarr[0].set_xticklabels(list(zip(*heatmap_df.columns.tolist()))[1])
+axarr[0].set_ylabel(r'Classifier one/both significant at $\alpha=0.05$')
+         
 heatmap_df = (new_pair_df
-    .loc[new_pair_df.reject_null_class2, ['reject_null_classifier', 'reject_null_park']]
+    .loc[new_pair_df.reject_null_class_perf, ['reject_null_class_both', 'reject_null_park']]
     .copy()
     .value_counts()
     .reset_index()
-    .pivot(index='reject_null_classifier', columns='reject_null_park')
+    .pivot(index='reject_null_class_both', columns='reject_null_park')
 )
-sns.heatmap(heatmap_df)
+sns.heatmap(heatmap_df, vmax=vmax, annot=True, fmt='d', ax=axarr[1])
+axarr[1].set_xlabel(r'Park et al. significant at $\alpha=0.05$')
+axarr[1].set_xticklabels(list(zip(*heatmap_df.columns.tolist()))[1])
+axarr[1].set_ylabel('')
+
+plt.title('Park et al. vs one/both statistical testing')
 
 
-# In[ ]:
+# In the heatmaps above, we're looking at the same data as before, but with each gene/cancer type binarized into significant/not significant for each of the two "two-hit" tests.
+# 
+# My interpretation of this is that our gene expression classifier-based method tends to find more significant examples (bottom left square) than the Park et al. method (top right square and bottom right square). This is the opposite of what I expected; I had thought that using gene expression would be more specific than just looking at mutation co-occurrence. We'll have to explore this more in the future, since it's a somewhat counterintuitive result.
+
+# ### Count examples with sufficient "both" samples
+# 
+# As a next step, we're thinking about training classifiers to *directly* detect samples with two hits (i.e. a CNV and a point mutation). We want to quickly check how many genes/cancer types this would be feasible for here.
+
+# In[36]:
 
 
+status_count_df = (park_info_df
+  .groupby(by=['identifier', 'status'])
+  .count()
+  .loc[:, ['class']]
+  .unstack('status')
+  .fillna(0)
+  .astype(int)
+)
+status_count_df.columns = status_count_df.columns.droplevel(0)
+status_count_df.head()
 
+
+# In[37]:
+
+
+sum_df = status_count_df.sum(axis=1)
+sum_df.index.rename('identifier', inplace=True)
+status_prop_df = status_count_df.div(sum_df, axis=0)
+status_prop_df.head()
+
+
+# In[38]:
+
+
+def valid_ixs_from_threshold(count_threshold, prop_threshold=0.05):
+    valid_ixs = (status_count_df.loc[
+        ((status_prop_df['both'] > prop_threshold) & (status_prop_df['none'] > prop_threshold)) &
+        ((status_count_df['both'] > count_threshold) & (status_count_df['none'] > count_threshold)), :
+    ]).index
+    # TODO: debug classifiers causing this issue
+    index_count_df = (status_count_df
+        .loc[valid_ixs, :]
+        .drop_duplicates(keep='first')
+    )
+    return (index_count_df.index, index_count_df.shape[0])
+
+print(valid_ixs_from_threshold(5)[0][:5])
+print(valid_ixs_from_threshold(5)[1])
+
+
+# In[39]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+thresholds = [5, 10, 20, 30, 40, 50]
+line_df = pd.DataFrame([
+    thresholds,
+    [valid_ixs_from_threshold(t)[1] for t in thresholds]
+], index=['threshold', 'valid_ixs']).T
+
+sns.pointplot(data=line_df, x='threshold', y='valid_ixs')
+plt.xlabel('Threshold for positive/negative sample count')
+plt.ylabel('Number of valid genes/cancer types')
+
+
+# In[40]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+thresholds = [5, 10, 20, 30, 40, 50]
+line_df = pd.DataFrame([
+    thresholds,
+    [valid_ixs_from_threshold(t)[1] / status_count_df.shape[0] for t in thresholds]
+], index=['threshold', 'valid_ixs']).T
+
+sns.pointplot(data=line_df, x='threshold', y='valid_ixs')
+plt.xlabel('Threshold for positive/negative sample count')
+plt.ylabel('Proportion of valid genes/cancer types')
+
+
+# In[41]:
+
+
+status_count_df.loc[valid_ixs_from_threshold(50)[0][:10], :]
 
