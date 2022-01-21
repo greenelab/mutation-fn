@@ -600,7 +600,7 @@ axarr[1].set_xlabel(r'Park et al. significant at $\alpha=0.05$')
 axarr[1].set_xticklabels(list(zip(*heatmap_df.columns.tolist()))[1])
 axarr[1].set_ylabel('')
 
-plt.title('Park et al. vs one/both statistical testing')
+plt.suptitle('Park et al. vs one/both statistical testing')
 
 
 # In the heatmaps above, we're looking at the same data as before, but with each gene/cancer type binarized into significant/not significant for each of the two "two-hit" tests.
@@ -686,8 +686,4 @@ plt.xlabel('Threshold for positive/negative sample count')
 plt.ylabel('Proportion of valid genes/cancer types')
 
 
-# In[41]:
-
-
-status_count_df.loc[valid_ixs_from_threshold(50)[0][:10], :]
-
+# From these results, it seems like there are a substantial number of gene/cancer type combinations with considerable numbers of both "none" and "both" samples. This suggests that we could probably train models directly to predict whether or not a sample has two hits, at least in some cases.
