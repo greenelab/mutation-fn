@@ -9,6 +9,13 @@ from scipy.stats import ttest_ind, ttest_rel
 from statsmodels.stats.multitest import multipletests
 
 def test_all(info_df, fdr_correction=True, correction_alpha=0.05):
+    """Statistical comparison of samples with 'one' hit vs. samples with 'both'.
+
+    Essentially, this is just a t-test for each gene/cancer type in info_df,
+    comparing our classifier scores for each of these sample categories. A
+    significant result suggests that the classifier performs better for samples
+    with two hits (point mutation + CNV) than samples with only one.
+    """
     ind_results = []
     for identifier in info_df.identifier.unique():
         test_df = info_df[info_df.identifier == identifier].copy()
@@ -23,6 +30,7 @@ def test_all(info_df, fdr_correction=True, correction_alpha=0.05):
 
 
 def test_one_vs_both(test_df):
+    """Test a single sample; return mean change and unpaired t-test p-value."""
     one_hit_samples = test_df[test_df.status == 'one'].positive_prob.values
     both_hit_samples = test_df[test_df.status == 'both'].positive_prob.values
     if one_hit_samples.shape[0] < 2 or both_hit_samples.shape[0] < 2:
