@@ -91,7 +91,7 @@ input_str = str(input_file)
 lgg_counts_df.to_csv(input_file, sep='\t')
 
 
-# In[22]:
+# In[8]:
 
 
 # get IDH1 mutation status
@@ -102,7 +102,7 @@ idh1_status_df = (mutation_df
 idh1_status_df.head()
 
 
-# In[23]:
+# In[9]:
 
 
 # save mutation status to file, to be loaded by DESeq2
@@ -112,14 +112,69 @@ input_metadata_str = str(input_metadata_file)
 idh1_status_df.to_csv(input_metadata_file, sep='\t')
 
 
-# In[24]:
+# In[10]:
 
 
 get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
 
 
-# In[25]:
+# In[11]:
 
 
 get_ipython().run_cell_magic('R', '-i base_dir -i input_metadata_str -i input_str -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\nget_DE_stats_DESeq(input_metadata_str,\n                   input_str,\n                   'LGG_IDH1',\n                   output_dir)")
+
+
+# ### DE between random samples in low-grade glioma
+# 
+# We do this to generate an empirical null distribution for our results in IDH1 mutants/wild-type samples.
+
+# In[12]:
+
+
+# number of random samples
+n_samples = 5
+
+
+# In[13]:
+
+
+n_mutated = idh1_status_df.sum().values[0]
+n_not_mutated = idh1_status_df.shape[0] - n_mutated
+print(n_mutated, n_not_mutated)
+
+
+# In[14]:
+
+
+# we can use sklearn train_test_split to partition the data randomly
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+for sample_ix in range(n_samples):
+    _, test_ixs = train_test_split(idh1_status_df.index,
+                                   test_size=n_mutated,
+                                   shuffle=True,
+                                   random_state=sample_ix)
+    labels_df = pd.DataFrame(
+        np.zeros(idh1_status_df.shape[0]).astype(int),
+        index=idh1_status_df.index.copy(),
+        columns=['group']
+    )
+    labels_df.loc[test_ixs, 'group'] = 1
+    
+    save_file = cfg.de_input_dir / 'lgg_idh1_random_s{}.tsv'.format(sample_ix)
+    print(str(save_file))
+    labels_df.to_csv(save_file, sep='\t')
+
+
+# In[15]:
+
+
+input_metadata_dir = str(cfg.de_input_dir)
+
+
+# In[ ]:
+
+
+get_ipython().run_cell_magic('R', '-i base_dir -i input_str -i n_samples -i input_metadata_dir -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\nfor (i in 0:(n_samples-1)) {\n    print(paste('Running: ', i))\n    input_metadata_str <- paste(\n        input_metadata_dir, '/lgg_idh1_random_s', i, '.tsv',\n        sep=''\n    )\n    get_DE_stats_DESeq(input_metadata_str,\n                       input_str,\n                       paste('LGG_IDH1_random_s', i, sep=''),\n                       output_dir)\n}")
 
