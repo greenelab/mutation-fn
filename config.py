@@ -9,7 +9,7 @@ data_dir = repo_root / 'data'
 de_data_dir = repo_root / '4_de_analysis' / 'data'
 raw_de_data_dir = de_data_dir / 'raw'
 processed_counts_file = de_data_dir / 'tcga_processed_counts.tsv.gz'
-
+de_sample_info = de_data_dir / 'tcga_expression_sample_identifiers.tsv'
 
 # location of mpmp repo, some analyses depend on this
 mpmp_location = pathlib.Path('~/research/mpmp/')
