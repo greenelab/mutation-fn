@@ -57,7 +57,7 @@ mutation_df.iloc[:5, :5]
 
 # ### DE between IDH1 mutant/wild-type samples in low-grade glioma
 
-# In[25]:
+# In[5]:
 
 
 cfg.de_input_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +67,7 @@ base_dir = str(cfg.de_base_dir)
 output_dir = str(cfg.de_output_dir)
 
 
-# In[26]:
+# In[6]:
 
 
 # get LGG samples from counts data
@@ -81,7 +81,7 @@ print(lgg_counts_df.shape)
 lgg_counts_df.iloc[:5, :5]
 
 
-# In[27]:
+# In[7]:
 
 
 # save LGG samples to file, to be loaded by DESeq2
@@ -91,32 +91,35 @@ input_str = str(input_file)
 lgg_counts_df.to_csv(input_file, sep='\t')
 
 
-# In[28]:
+# In[22]:
 
 
 # get IDH1 mutation status
-idh1_status_df = mutation_df.loc[lgg_samples, ['IDH1']]
+idh1_status_df = (mutation_df
+    .loc[lgg_samples, ['IDH1']]
+    .rename(columns={'IDH1': 'group'})
+)
 idh1_status_df.head()
 
 
-# In[30]:
+# In[23]:
 
 
 # save mutation status to file, to be loaded by DESeq2
 input_metadata_file = cfg.de_input_dir / 'lgg_idh1_status.tsv'
-input_metadata_str = str(input_file)
+input_metadata_str = str(input_metadata_file)
 
 idh1_status_df.to_csv(input_metadata_file, sep='\t')
 
 
-# In[10]:
+# In[24]:
 
 
 get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
 
 
-# In[12]:
+# In[25]:
 
 
-get_ipython().run_cell_magic('R', '-i base_dir -i input_dir -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))")
+get_ipython().run_cell_magic('R', '-i base_dir -i input_metadata_str -i input_str -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\nget_DE_stats_DESeq(input_metadata_str,\n                   input_str,\n                   'LGG_IDH1',\n                   output_dir)")
 
