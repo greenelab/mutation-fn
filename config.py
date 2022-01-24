@@ -5,9 +5,11 @@ repo_root = pathlib.Path(__file__).resolve().parent
 # important subdirectories
 data_dir = repo_root / 'data'
 
-# important subdirectories
+# differential expression directories/files
 de_data_dir = repo_root / '4_de_analysis' / 'data'
 raw_de_data_dir = de_data_dir / 'raw'
+processed_counts_file = de_data_dir / 'tcga_processed_counts.tsv.gz'
+
 
 # location of mpmp repo, some analyses depend on this
 mpmp_location = pathlib.Path('~/research/mpmp/')

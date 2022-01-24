@@ -35,7 +35,7 @@ if not output_filename.is_file():
     counts_df.to_csv(output_filename, sep='\t')
 else:
     print('Loading from existing raw data file')
-    counts_df = pd.read_csv(output_filename, sep='\t')
+    counts_df = pd.read_csv(output_filename, sep='\t', index_col=0)
     
 counts_df.iloc[:5, :5]
 
@@ -62,6 +62,25 @@ counts_df.columns.name = None
 # In[4]:
 
 
-print(counts_df.shape)
 counts_df.iloc[:5, :5]
+
+
+# In[5]:
+
+
+# per the documentation for the Xena Browser, these are log-transformed
+# expected counts - see: 
+# https://toil-xena-hub.s3.us-east-1.amazonaws.com/download/tcga_gene_expected_count.json
+#
+# we want to un-log transform them here (2^x - 1), and round to the nearest integer,
+# to prepare for DE analysis
+print('After transform:', counts_df.min().min(), counts_df.max().max())
+counts_df = ((2 ** counts_df) - 1).round(0).astype(int)
+print('Before transform:', counts_df.min().min(), counts_df.max().max())
+
+
+# In[6]:
+
+
+counts_df.to_csv(cfg.processed_counts_file, sep='\t')
 
