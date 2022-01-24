@@ -1,10 +1,14 @@
 name: mutation_fn
 channels:
   - conda-forge
+  - r
+  - bioconda
   - defaults
 dependencies:
-  - ipykernel=6.6.0=py38he5a9106_0
-  - ipython=7.30.1=py38h578d9bd_0
+  - r::r-base=4.0.3
+  - bioconda::bioconductor-deseq2
+  - ipykernel=6.6.0
+  - ipython=7.30.1
   - matplotlib-base=3.5.1
   - matplotlib-venn=0.11.6
   - numpy=1.21.4

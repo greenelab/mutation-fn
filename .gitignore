@@ -1,3 +1,7 @@
 **/__pycache__/*
 **/.ipynb_checkpoints/*
 **/data/*
+
+# don't track DE input/output files
+4_de_analysis/de_input/*
+4_de_analysis/de_output/*

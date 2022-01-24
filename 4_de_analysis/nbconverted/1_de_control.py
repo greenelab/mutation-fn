@@ -55,4 +55,68 @@ print(mutation_df.shape)
 mutation_df.iloc[:5, :5]
 
 
-# ### Differential expression between IDH1 mutant/wild-type samples in glioma
+# ### DE between IDH1 mutant/wild-type samples in low-grade glioma
+
+# In[25]:
+
+
+cfg.de_input_dir.mkdir(parents=True, exist_ok=True)
+cfg.de_output_dir.mkdir(parents=True, exist_ok=True)
+
+base_dir = str(cfg.de_base_dir)
+output_dir = str(cfg.de_output_dir)
+
+
+# In[26]:
+
+
+# get LGG samples from counts data
+lgg_samples = (
+    sample_info_df[sample_info_df.cancer_type == 'LGG'].index
+      .intersection(all_counts_df.index)
+      .intersection(mutation_df.index)
+)
+lgg_counts_df = all_counts_df.loc[lgg_samples, :]
+print(lgg_counts_df.shape)
+lgg_counts_df.iloc[:5, :5]
+
+
+# In[27]:
+
+
+# save LGG samples to file, to be loaded by DESeq2
+input_file = cfg.de_input_dir / 'lgg_counts.tsv'
+input_str = str(input_file)
+
+lgg_counts_df.to_csv(input_file, sep='\t')
+
+
+# In[28]:
+
+
+# get IDH1 mutation status
+idh1_status_df = mutation_df.loc[lgg_samples, ['IDH1']]
+idh1_status_df.head()
+
+
+# In[30]:
+
+
+# save mutation status to file, to be loaded by DESeq2
+input_metadata_file = cfg.de_input_dir / 'lgg_idh1_status.tsv'
+input_metadata_str = str(input_file)
+
+idh1_status_df.to_csv(input_metadata_file, sep='\t')
+
+
+# In[10]:
+
+
+get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
+
+
+# In[12]:
+
+
+get_ipython().run_cell_magic('R', '-i base_dir -i input_dir -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))")
+
