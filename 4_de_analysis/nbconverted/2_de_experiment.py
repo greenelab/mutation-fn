@@ -20,13 +20,20 @@ get_ipython().run_line_magic('autoreload', '2')
 # In[2]:
 
 
+cfg.de_input_dir.mkdir(parents=True, exist_ok=True)
+cfg.de_output_dir.mkdir(parents=True, exist_ok=True)
+
+
+# In[3]:
+
+
 # load gene expression counts data
 all_counts_df = pd.read_csv(cfg.processed_counts_file, sep='\t', index_col=0)
 print(all_counts_df.shape)
 all_counts_df.iloc[:5, :5]
 
 
-# In[3]:
+# In[4]:
 
 
 # load park et al. initial analysis results here
@@ -38,7 +45,7 @@ print(park_info_df.shape)
 park_info_df.head()
 
 
-# In[4]:
+# In[5]:
 
 
 # for now, we'll just run these with a few hand-picked examples
@@ -51,7 +58,7 @@ class_4_id = 'TP53_BRCA'
 class_ids = [class_1_id, class_2_id, class_3_id, class_4_id]
 
 
-# In[5]:
+# In[6]:
 
 
 exp_output = str(cfg.de_input_dir / '{}_{}_{}_counts.tsv')
@@ -80,8 +87,28 @@ for class_id in class_ids:
             exp_output.format(class_id, status_1, status_2),
             sep='\t'
         )
-        info_df.to_csv(
+        info_df.status.to_csv(
             info_output.format(class_id, status_1, status_2),
             sep='\t'
         )
+
+
+# In[7]:
+
+
+base_dir = str(cfg.de_base_dir)
+input_dir = str(cfg.de_input_dir)
+output_dir = str(cfg.de_output_dir)
+
+
+# In[8]:
+
+
+get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
+
+
+# In[9]:
+
+
+get_ipython().run_cell_magic('R', '-i base_dir -i input_dir -i output_dir ', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\n# this stuff probably shouldn't be hardcoded, but fine for now\nidentifiers <- c(\n    'NF2_KIRP',\n    'PTEN_UCEC',\n    'KRAS_COADREAD',\n    'TP53_BRCA'\n)\n\nstatus_combs <- list()\nstatus_combs[[1]] <- c('none', 'one')\nstatus_combs[[2]] <- c('none', 'both')\nstatus_combs[[3]] <- c('one', 'both')\n\nfor (i in 1:length(identifiers)) {\n    identifier <- identifiers[i]\n    for (j in 1:length(status_combs)) {\n        status_1 <- status_combs[[j]][1]\n        status_2 <- status_combs[[j]][2]\n        counts_file <- paste(input_dir,\n                             '/',\n                             identifier,\n                             '_',\n                             status_1,\n                             '_',\n                             status_2,\n                             '_counts.tsv',\n                             sep='')\n        info_file <- paste(input_dir,\n                           '/',\n                           identifier,\n                           '_',\n                           status_1,\n                           '_',\n                           status_2,\n                           '_info.tsv',\n                           sep='')\n        print(counts_file)\n        print(info_file)\n        # get_DE_stats_DESeq(info_file,\n        #                    counts_file,\n        #                    paste(identifier, '_', status_1, '_', status_2,\n        #                          sep=''),\n        #                    output_dir)\n        \n    }\n}")
 
