@@ -4,6 +4,7 @@ repo_root = pathlib.Path(__file__).resolve().parent
 
 # important subdirectories
 data_dir = repo_root / 'data'
+park_info_file = data_dir / 'park_info_samples.tsv'
 
 # differential expression directories/files
 de_base_dir = repo_root / '4_de_analysis'
