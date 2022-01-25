@@ -189,3 +189,90 @@ get_ipython().run_cell_magic('R', '-i RUN_DE_ANALYSIS -i base_dir -i input_str -
 
 
 # ### Compare IDH1 mutation DE results to randomly sampled results
+
+# In[18]:
+
+
+idh1_de_results_df = pd.read_csv(
+    cfg.de_output_dir / 'DE_stats_LGG_IDH1.txt',
+    sep='\t'
+)
+
+print(idh1_de_results_df.shape)
+idh1_de_results_df.head()
+
+
+# In[19]:
+
+
+random_de_results = []
+for i in range(n_samples):
+    
+    random_de_results.append(
+        pd.read_csv(
+            cfg.de_output_dir / 'DE_stats_LGG_IDH1_random_s{}.txt'.format(i),
+            sep='\t'
+        )
+    )
+    
+print(random_de_results[0].shape)
+random_de_results[0].head()
+
+
+# In[20]:
+
+
+# adjusted p-value threshold
+alpha = 0.05
+
+idh1_de_count = (
+    (idh1_de_results_df.padj < alpha).sum()
+)
+
+random_de_count = [
+    (random_de_results[ix].padj < alpha).sum() for ix in range(n_samples)
+]
+
+print('DE genes for IDH1 WT vs. mutant:', idh1_de_count)
+print('DE genes for random size-matched samples:', random_de_count)
+
+
+# In[30]:
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set({'figure.figsize': (8, 6)})
+
+sns.kdeplot(data=idh1_de_results_df.pvalue, label='true')
+for ix in range(n_samples):
+    if ix == 0:
+        sns.kdeplot(data=random_de_results[ix].pvalue,
+                    color='red', label='random')
+    else:
+        sns.kdeplot(data=random_de_results[ix].pvalue, color='red')
+plt.title('Uncorrected p-value density distributions')
+plt.xlabel('uncorrected p-value')
+plt.legend()
+
+
+# In[31]:
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set({'figure.figsize': (8, 6)})
+
+sns.kdeplot(data=idh1_de_results_df.padj, label='true')
+for ix in range(n_samples):
+    if ix == 0:
+        sns.kdeplot(data=random_de_results[ix].padj,
+                    color='red', label='random')
+    else:
+        sns.kdeplot(data=random_de_results[ix].padj, color='red')
+plt.title('FDR corrected p-value density distributions')
+plt.xlabel('Corrected p-value')
+plt.legend()
+
