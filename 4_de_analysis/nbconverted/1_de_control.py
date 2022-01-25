@@ -22,9 +22,18 @@ get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
 
+# In[2]:
+
+
+# if True rerun DE analysis and overwrite existing results 
+# if False look for existing results and don't rerun DE analysis
+# (the latter makes the notebook run much faster)
+RUN_DE_ANALYSIS = False
+
+
 # ### Load datasets
 
-# In[2]:
+# In[3]:
 
 
 # load counts data
@@ -33,7 +42,7 @@ print(all_counts_df.shape)
 all_counts_df.iloc[:5, :5]
 
 
-# In[3]:
+# In[4]:
 
 
 # load cancer types
@@ -42,7 +51,7 @@ print(sample_info_df.shape)
 sample_info_df.head()
 
 
-# In[4]:
+# In[5]:
 
 
 # load mutation status
@@ -57,7 +66,7 @@ mutation_df.iloc[:5, :5]
 
 # ### DE between IDH1 mutant/wild-type samples in low-grade glioma
 
-# In[5]:
+# In[6]:
 
 
 cfg.de_input_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +76,7 @@ base_dir = str(cfg.de_base_dir)
 output_dir = str(cfg.de_output_dir)
 
 
-# In[6]:
+# In[7]:
 
 
 # get LGG samples from counts data
@@ -81,7 +90,7 @@ print(lgg_counts_df.shape)
 lgg_counts_df.iloc[:5, :5]
 
 
-# In[7]:
+# In[8]:
 
 
 # save LGG samples to file, to be loaded by DESeq2
@@ -91,7 +100,7 @@ input_str = str(input_file)
 lgg_counts_df.to_csv(input_file, sep='\t')
 
 
-# In[8]:
+# In[9]:
 
 
 # get IDH1 mutation status
@@ -102,7 +111,7 @@ idh1_status_df = (mutation_df
 idh1_status_df.head()
 
 
-# In[9]:
+# In[10]:
 
 
 # save mutation status to file, to be loaded by DESeq2
@@ -112,30 +121,30 @@ input_metadata_str = str(input_metadata_file)
 idh1_status_df.to_csv(input_metadata_file, sep='\t')
 
 
-# In[10]:
+# In[11]:
 
 
 get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
 
 
-# In[11]:
+# In[12]:
 
 
-get_ipython().run_cell_magic('R', '-i base_dir -i input_metadata_str -i input_str -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\nget_DE_stats_DESeq(input_metadata_str,\n                   input_str,\n                   'LGG_IDH1',\n                   output_dir)")
+get_ipython().run_cell_magic('R', '-i RUN_DE_ANALYSIS -i base_dir -i input_metadata_str -i input_str -i output_dir ', "\nif (RUN_DE_ANALYSIS) {\n    source(paste0(base_dir, '/de_analysis.R'))\n\n    get_DE_stats_DESeq(input_metadata_str,\n                       input_str,\n                       'LGG_IDH1',\n                       output_dir)\n} else {\n    print('Skipping DE analysis, will use existing results files')\n}")
 
 
 # ### DE between random samples in low-grade glioma
 # 
 # We do this to generate an empirical null distribution for our results in IDH1 mutants/wild-type samples.
 
-# In[12]:
+# In[13]:
 
 
 # number of random samples
 n_samples = 5
 
 
-# In[13]:
+# In[14]:
 
 
 n_mutated = idh1_status_df.sum().values[0]
@@ -143,7 +152,7 @@ n_not_mutated = idh1_status_df.shape[0] - n_mutated
 print(n_mutated, n_not_mutated)
 
 
-# In[14]:
+# In[15]:
 
 
 # we can use sklearn train_test_split to partition the data randomly
@@ -167,14 +176,16 @@ for sample_ix in range(n_samples):
     labels_df.to_csv(save_file, sep='\t')
 
 
-# In[15]:
+# In[16]:
 
 
 input_metadata_dir = str(cfg.de_input_dir)
 
 
-# In[ ]:
+# In[17]:
 
 
-get_ipython().run_cell_magic('R', '-i base_dir -i input_str -i n_samples -i input_metadata_dir -i output_dir', "\nsource(paste0(base_dir, '/de_analysis.R'))\n\nfor (i in 0:(n_samples-1)) {\n    print(paste('Running: ', i))\n    input_metadata_str <- paste(\n        input_metadata_dir, '/lgg_idh1_random_s', i, '.tsv',\n        sep=''\n    )\n    get_DE_stats_DESeq(input_metadata_str,\n                       input_str,\n                       paste('LGG_IDH1_random_s', i, sep=''),\n                       output_dir)\n}")
+get_ipython().run_cell_magic('R', '-i RUN_DE_ANALYSIS -i base_dir -i input_str -i n_samples -i input_metadata_dir -i output_dir', "\nif (RUN_DE_ANALYSIS) {\n    source(paste0(base_dir, '/de_analysis.R'))\n\n    for (i in 0:(n_samples-1)) {\n        print(paste('Running: ', i))\n        input_metadata_str <- paste(\n            input_metadata_dir, '/lgg_idh1_random_s', i, '.tsv',\n            sep=''\n        )\n        get_DE_stats_DESeq(input_metadata_str,\n                           input_str,\n                           paste('LGG_IDH1_random_s', i, sep=''),\n                           output_dir)\n    }\n} else {\n    print('Skipping DE analysis, will use existing results files')\n}")
 
+
+# ### Compare IDH1 mutation DE results to randomly sampled results
