@@ -126,3 +126,87 @@ get_ipython().run_line_magic('load_ext', 'rpy2.ipython')
 
 get_ipython().run_cell_magic('R', '-i RUN_DE_ANALYSIS -i base_dir -i input_dir -i output_dir ', "\nif (RUN_DE_ANALYSIS) {\n    source(paste0(base_dir, '/de_analysis.R'))\n\n    # this stuff probably shouldn't be hardcoded, but fine for now\n    identifiers <- c(\n        'NF2_KIRP',\n        'PTEN_UCEC',\n        'KRAS_COADREAD',\n        'TP53_BRCA'\n    )\n\n    status_combs <- list()\n    status_combs[[1]] <- c('none', 'one')\n    status_combs[[2]] <- c('none', 'both')\n    status_combs[[3]] <- c('one', 'both')\n\n    for (i in 1:length(identifiers)) {\n        identifier <- identifiers[i]\n        for (j in 1:length(status_combs)) {\n            status_1 <- status_combs[[j]][1]\n            status_2 <- status_combs[[j]][2]\n            counts_file <- paste(input_dir,\n                                 '/',\n                                 identifier,\n                                 '_',\n                                 status_1,\n                                 '_',\n                                 status_2,\n                                 '_counts.tsv',\n                                 sep='')\n            info_file <- paste(input_dir,\n                               '/',\n                               identifier,\n                               '_',\n                               status_1,\n                               '_',\n                               status_2,\n                               '_info.tsv',\n                               sep='')\n            print(counts_file)\n            print(info_file)\n            get_DE_stats_DESeq(info_file,\n                               counts_file,\n                               paste(identifier, '_', status_1, '_', status_2,\n                                     sep=''),\n                               output_dir)\n\n        }\n    }\n} else {\n    print('Skipping DE analysis, will use existing results files')\n}")
 
+
+# In[30]:
+
+
+identifier = 'NF2_KIRP'
+# adjusted p-value threshold
+alpha = 0.05
+
+none_one_de_results = pd.read_csv(
+    cfg.de_output_dir / 'DE_stats_{}_none_one.txt'.format(identifier), sep='\t'
+)
+print(none_one_de_results.shape)
+none_one_de_results.head()
+
+
+# In[31]:
+
+
+one_both_de_results = pd.read_csv(
+    cfg.de_output_dir / 'DE_stats_{}_one_both.txt'.format(identifier), sep='\t'
+)
+print(one_both_de_results.shape)
+one_both_de_results.head()
+
+
+# In[32]:
+
+
+none_both_de_results = pd.read_csv(
+    cfg.de_output_dir / 'DE_stats_{}_none_both.txt'.format(identifier), sep='\t'
+)
+print(none_both_de_results.shape)
+none_both_de_results.head()
+
+
+# In[33]:
+
+
+none_one_de_count = (
+    (none_one_de_results.padj < alpha).sum()
+)
+one_both_de_count = (
+    (one_both_de_results.padj < alpha).sum()
+)
+none_both_de_count = (
+    (none_both_de_results.padj < alpha).sum()
+)
+
+print('DE genes for {} none vs. one:'.format(identifier), none_one_de_count)
+print('DE genes for {} one vs. both:'.format(identifier), one_both_de_count)
+print('DE genes for {} none vs. both:'.format(identifier), none_both_de_count)
+
+
+# In[34]:
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set({'figure.figsize': (10, 8)})
+fig, axarr = plt.subplots(2, 1)
+
+sns.kdeplot(data=none_one_de_results.pvalue, label='none/one', ax=axarr[0])
+sns.kdeplot(data=one_both_de_results.pvalue, label='one/both', ax=axarr[0])
+sns.kdeplot(data=none_both_de_results.pvalue, label='none/both', ax=axarr[0])
+axarr[0].set_title('Uncorrected p-value density distributions')
+axarr[0].set_xlabel('Uncorrected p-value')
+axarr[0].legend()
+
+sns.kdeplot(data=none_one_de_results.padj, label='none/one', ax=axarr[1])
+sns.kdeplot(data=one_both_de_results.padj, label='one/both', ax=axarr[1])
+sns.kdeplot(data=none_both_de_results.padj, label='none/both', ax=axarr[1])
+axarr[1].set_title('FDR corrected p-value density distributions')
+axarr[1].set_xlabel('Corrected p-value')
+axarr[1].legend()
+
+plt.tight_layout()
+
+
+# In[ ]:
+
+
+
+
