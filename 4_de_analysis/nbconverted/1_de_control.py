@@ -219,7 +219,7 @@ print(random_de_results[0].shape)
 random_de_results[0].head()
 
 
-# In[32]:
+# In[20]:
 
 
 # adjusted p-value threshold
@@ -237,7 +237,7 @@ print('DE genes for IDH1 WT vs. mutant:', idh1_de_count)
 print('DE genes for random size-matched samples:', random_de_count)
 
 
-# In[30]:
+# In[21]:
 
 
 import matplotlib.pyplot as plt
@@ -257,7 +257,7 @@ plt.xlabel('uncorrected p-value')
 plt.legend()
 
 
-# In[31]:
+# In[22]:
 
 
 import matplotlib.pyplot as plt
@@ -276,3 +276,5 @@ plt.title('FDR corrected p-value density distributions')
 plt.xlabel('Corrected p-value')
 plt.legend()
 
+
+# We can see that there are far more differentially expressed genes between IDH1 mutants and IDH1 wild-type samples than there are between random sample groups, which is what we expected.

@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# ## Differential expression analysis pilot study
+# 
+# As a way of quantifying how similar/different the expression profiles associated with different mutation patterns are, we want to count the number of differentially expressed genes between them. This is a pilot experiment using a small subset of the genes/cancer types from Park et al., to see how well the number of DE genes lines up with the expectations for one-hit vs. multi-hit drivers described in that paper.
+
 # In[1]:
 
 
@@ -25,6 +29,8 @@ get_ipython().run_line_magic('autoreload', '2')
 # (the latter makes the notebook run much faster)
 RUN_DE_ANALYSIS = False
 
+
+# ### Load relevant data (gene expression & mutation status)
 
 # In[3]:
 
@@ -54,11 +60,13 @@ print(park_info_df.shape)
 park_info_df.head()
 
 
+# ### Run differential expression for selected examples
+# 
+# For now, we'll just run these with a few hand-picked examples, one from each Park et al. "class". The "classes" are described in the `3_park_analysis.ipynb` notebook.
+
 # In[6]:
 
 
-# for now, we'll just run these with a few hand-picked examples
-# in the future we should run for all examples + do some kind of synthesis
 class_1_id = 'NF2_KIRP'
 class_2_id = 'PTEN_UCEC'
 class_3_id = 'KRAS_COADREAD'
@@ -205,8 +213,6 @@ axarr[1].legend()
 plt.tight_layout()
 
 
-# In[ ]:
-
-
-
-
+# Results for all pilot examples are shown in [these Google slides](https://docs.google.com/presentation/d/1hjcxLztM2XbeNwIYL3fH0Xb9GsBCWFdMIH-9Q8jlXok/edit?usp=sharing). Within genes, we seem to see roughly the same patterns we saw with our mutation classifiers in `3_park_analysis`. However, it seems pretty clear from our examples that between-gene comparisons are going to be hard due to variability in sample size, as comparisons with more samples in the classes being compared are almost always going to have better power to detect DE genes.
+# 
+# Our goal in our next analysis, then, will be to find some sort of distance metric or projection that can compare groups of samples, while normalizing or averaging over varying sample counts.
