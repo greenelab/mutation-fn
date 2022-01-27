@@ -87,10 +87,10 @@ assert md5_sum[0].split(' ')[0] == manifest_df.loc['mutation'].md5
 
 
 copy_url = 'https://ndownloader.figshare.com/files/11095412'
-copy_filename = cfg.data_dir / 'pancan_GISTIC_threshold.tsv'
+copy_filepath = cfg.data_dir / 'pancan_GISTIC_threshold.tsv'
 
 if not copy_filename.is_file():
-    wget.download(copy_url, out=str(copy_filename))
+    wget.download(copy_url, out=str(copy_filepath))
 else:
     print('Downloaded data file already exists, skipping download')
 

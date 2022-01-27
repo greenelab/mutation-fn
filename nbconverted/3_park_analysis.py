@@ -181,8 +181,6 @@ copy_gain_df.iloc[:5, :5]
 # In[13]:
 
 
-# TODO: document
-
 park_loss_sig_df = pd.read_csv(park_loss_sig_data, sep='\t', index_col=0)
 park_gain_sig_df = pd.read_csv(park_gain_sig_data, sep='\t', index_col=0)
 
@@ -493,10 +491,10 @@ class_order = ['class 1', 'class 2', 'class 3', 'class 4']
 sns.set({'figure.figsize': (8, 6)})
 sns.scatterplot(data=pair_df, x='classifier_pval', y='park_pval',
                 hue='class', hue_order=class_order)
-plt.xlim(-0.1, 1.1)
-plt.ylim(-0.1, 1.1)
-plt.xlabel('Classifier p-value')
-plt.ylabel('Park et al. p-value')
+plt.xlim(1.1, -0.1)
+plt.ylim(1.1, -0.1)
+plt.xlabel('Classifier p-value (decreasing)')
+plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, all Park genes')
 
 
@@ -508,10 +506,10 @@ sns.scatterplot(data=pair_df, x='classifier_pval', y='park_pval',
                 hue='class', hue_order=class_order)
 plt.xscale('log')
 plt.yscale('log')
-plt.xlim(10**-10, 10**0+1)
-plt.ylim(10**-10, 10**0+1)
-plt.xlabel('Classifier p-value')
-plt.ylabel('Park et al. p-value')
+plt.xlim(10**0+1, 10**-10)
+plt.ylim(10**0+1, 10**-10)
+plt.xlabel('Classifier p-value (decreasing)')
+plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, all Park genes')
 
 
@@ -559,10 +557,10 @@ class_order = ['class 1', 'class 2', 'class 3', 'class 4']
 sns.set({'figure.figsize': (8, 6)})
 sns.scatterplot(data=new_pair_df[new_pair_df.reject_null_class_perf],
                 x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
-plt.xlim(-0.1, 1.1)
-plt.ylim(-0.1, 1.1)
-plt.xlabel('Classifier p-value')
-plt.ylabel('Park et al. p-value')
+plt.xlim(1.1, -0.1)
+plt.ylim(1.1, -0.1)
+plt.xlabel('Classifier p-value (decreasing)')
+plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
@@ -577,10 +575,10 @@ sns.scatterplot(data=new_pair_df[((new_pair_df.reject_null_park) |
                 x='classifier_pval', y='park_pval', hue='class', hue_order=class_order)
 plt.xscale('log')
 plt.yscale('log')
-plt.xlim(10**-10, 10**0+1)
-plt.ylim(10**-10, 10**0+1)
-plt.xlabel('Classifier p-value')
-plt.ylabel('Park et al. p-value')
+plt.xlim(10**0+1, 10**-10)
+plt.ylim(10**0+1, 10**-10)
+plt.xlabel('Classifier p-value (decreasing)')
+plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
