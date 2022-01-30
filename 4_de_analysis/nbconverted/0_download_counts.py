@@ -3,7 +3,7 @@
 
 # ## Download pan-cancer RNA-seq read counts data from UCSC Xena Browser
 # 
-# The other RNA-seq data we downloaded in `0_data_download` contains pre-processed RPKM values. In order to do differential expression analysis, most methods recommend using count data, or something similar such as [RSEM expected counts](https://support.bioconductor.org/p/90672/#90678) (which is what we'll download here).
+# The other RNA-seq data we downloaded in `0_data_download` contains pre-processed RPKM values. In order to do differential expression analysis, most methods recommend using count data, or something similar such as [RSEM expected counts](https://support.bioconductor.org/p/90672/#90678) (which is what we'll download here). This is because most DE methods do their own normalization to ensure that expression levels are comparable between samples, which is not necessarily true for quantities such as RPKM; [see here](https://hbctraining.github.io/DGE_workshop/lessons/02_DGE_count_normalization.html) for a more detailed explanation.
 # 
 # GDC does not seem to store RNA-seq read counts (that I'm aware of), so we'll download it from the UCSC Xena Browser instead. This data was generated as part of the Pan-Cancer Atlas project so it should apply to the same set of samples.
 
@@ -11,7 +11,6 @@
 
 
 import pandas as pd
-# from urllib.request import urlretrieve
 
 import sys; sys.path.append('..')
 import config as cfg
