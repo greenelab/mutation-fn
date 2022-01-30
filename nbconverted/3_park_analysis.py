@@ -260,13 +260,14 @@ def get_info_for_gene_and_tissue(identifier, classification):
     """
     gene, tissue = identifier.split('_')
     preds_file = park_preds_dir / '{}_expression_False_raw_preds.tsv'.format(identifier)
-    preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1,
-                           names=['sample_id', gene])
+    preds_df = pd.read_csv(preds_file, sep='\t', skiprows=1, index_col=0,
+                           names=['score', 'positive_prob'])
+    preds_df.index.name = 'sample_id'
     
     # get predictions for identifier
     preds_df['identifier'] = identifier
-    preds_df['positive_prob'] = expit(preds_df[gene])
-    preds_df.drop(columns=[gene], inplace=True)
+    # preds_df['positive_prob'] = expit(preds_df.score)
+    preds_df.drop(columns=['score'], inplace=True)
     
     # get mutation status for samples
     preds_df['mutation_status'] = mutation_df.loc[preds_df.index, gene]
@@ -293,17 +294,17 @@ def get_info_for_gene_and_tissue(identifier, classification):
     return preds_df
 
 
-# In[17]:
+# In[132]:
 
 
-plot_id = 'CDH1_BRCA'
+plot_id = 'MAP3K1_UCEC'
 df = get_info_for_gene_and_tissue(plot_id, 'TSG')
 print(df.mutation_status.isna().sum())
 print(df.copy_status.isna().sum())
 df.head()
 
 
-# In[18]:
+# In[133]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -311,7 +312,7 @@ sns.violinplot(x=df.positive_prob)
 plt.title('Distribution of positive probabilities for {}'.format(plot_id))
 
 
-# In[19]:
+# In[134]:
 
 
 order = ['none', 'one', 'both']
@@ -375,10 +376,19 @@ park_info_df.head()
 # In[23]:
 
 
-park_info_df.groupby(by=['class']).count()
+# save park sample-level info to file, we'll use it in later analyses
+park_info_df.to_csv(
+    cfg.park_info_file, sep='\t'
+)
 
 
 # In[24]:
+
+
+park_info_df.groupby(by=['class']).count()
+
+
+# In[25]:
 
 
 order = ['none', 'one', 'both']
@@ -392,7 +402,7 @@ plt.xticks(np.arange(3),
            ['{} (n={})'.format(l, count_map[l]) for l in order])
 
 
-# In[25]:
+# In[26]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -414,7 +424,7 @@ for ix, class_label in enumerate(['class 1', 'class 2', 'class 3', 'class 4']):
 
 # ### Statistical testing for individual gene/cancer type combinations
 
-# In[26]:
+# In[27]:
 
 
 info_compare_df = ut.test_all(park_info_df)
@@ -423,7 +433,13 @@ print('reject null for:', info_compare_df.reject_null.sum(), '/', info_compare_d
 info_compare_df.sort_values(by='corr_pval', ascending=True).head()
 
 
-# In[27]:
+# In[42]:
+
+
+info_compare_df.to_csv(cfg.data_dir / 'info_compare.tsv', sep='\t')
+
+
+# In[28]:
 
 
 # plot top three most significant
@@ -454,7 +470,7 @@ for ix, identifier in enumerate(plot_ids):
 
 # ### Compare classifier-based statistical testing vs. Park et al statistical testing
 
-# In[28]:
+# In[29]:
 
 
 pair_df = (info_compare_df
@@ -468,7 +484,7 @@ print(pair_df.classifier_pval.isna().sum())
 pair_df.head()
 
 
-# In[29]:
+# In[30]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
@@ -482,7 +498,7 @@ plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, all Park genes')
 
 
-# In[30]:
+# In[31]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -509,7 +525,7 @@ plt.title('Classifier vs. Park p-value, all Park genes')
 # 
 # The latter two p-values are both ways to quantify "two-hit-ness", or the degree to which the gene behaves as a "two-hit" driver in the relevant cancer type. We want to see to what extent the measurements agree, *conditional on* good classifier performance.
 
-# In[31]:
+# In[32]:
 
 
 class_sig_df = ut.get_classifier_significance(pair_df.identifier.unique().tolist(), park_preds_dir)
@@ -519,7 +535,7 @@ print('Significant classifiers:', class_sig_df.reject_null.sum(), '/', class_sig
 class_sig_df.head(10)
 
 
-# In[32]:
+# In[33]:
 
 
 new_pair_df = pair_df.merge(
@@ -534,7 +550,7 @@ new_pair_df['reject_null_park'] = (new_pair_df.park_pval < 0.05)
 new_pair_df.head()
 
 
-# In[33]:
+# In[34]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
@@ -548,7 +564,7 @@ plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
-# In[34]:
+# In[35]:
 
 
 class_order = ['class 1', 'class 2', 'class 3', 'class 4']
@@ -566,7 +582,7 @@ plt.ylabel('Park et al. p-value (decreasing)')
 plt.title('Classifier vs. Park p-value, "good" classifiers')
 
 
-# In[35]:
+# In[36]:
 
 
 sns.set({'figure.figsize': (12, 4)})
@@ -609,7 +625,7 @@ plt.suptitle('Park et al. vs one/both statistical testing')
 # 
 # As a next step, we're thinking about training classifiers to *directly* detect samples with two hits (i.e. a CNV and a point mutation). We want to quickly check how many genes/cancer types this would be feasible for here.
 
-# In[36]:
+# In[37]:
 
 
 status_count_df = (park_info_df
@@ -624,7 +640,7 @@ status_count_df.columns = status_count_df.columns.droplevel(0)
 status_count_df.head()
 
 
-# In[37]:
+# In[38]:
 
 
 sum_df = status_count_df.sum(axis=1)
@@ -633,7 +649,7 @@ status_prop_df = status_count_df.div(sum_df, axis=0)
 status_prop_df.head()
 
 
-# In[38]:
+# In[39]:
 
 
 def valid_ixs_from_threshold(count_threshold, prop_threshold=0.05):
@@ -652,7 +668,7 @@ print(valid_ixs_from_threshold(5)[0][:5])
 print(valid_ixs_from_threshold(5)[1])
 
 
-# In[39]:
+# In[40]:
 
 
 sns.set({'figure.figsize': (8, 6)})
@@ -668,7 +684,7 @@ plt.xlabel('Threshold for positive/negative sample count')
 plt.ylabel('Number of valid genes/cancer types')
 
 
-# In[40]:
+# In[41]:
 
 
 sns.set({'figure.figsize': (8, 6)})
