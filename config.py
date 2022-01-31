@@ -15,6 +15,12 @@ raw_de_data_dir = de_data_dir / 'raw'
 processed_counts_file = de_data_dir / 'tcga_processed_counts.tsv.gz'
 de_sample_info = de_data_dir / 'tcga_expression_sample_identifiers.tsv'
 
+# distance analysis directories/files
+distance_base_dir = repo_root / '5_distance_analysis'
+distance_data_dir = distance_base_dir / 'data'
+distance_loss_info = distance_data_dir / 'park_loss_num_hits.pkl'
+distance_gain_info = distance_data_dir / 'park_gain_num_hits.pkl'
+
 # location of mpmp repo, some analyses depend on this
 mpmp_location = pathlib.Path('~/research/mpmp/')
 
