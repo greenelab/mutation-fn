@@ -114,25 +114,50 @@ park_loss_info['TP53_BRCA'].head()
 
 # ### Calculate distance between means/medians for given gene + cancer type
 
-# In[9]:
+# In[25]:
 
+
+from scipy.spatial.distance import pdist, squareform
 
 def get_centroids_and_distance(identifier, info_map, centroid_method='mean'):
+    # get sample mutation info and class counts
     park_id_df = info_map[identifier]
-    print(park_id_df.shape)
-    print(park_id_df.head())
-    print(park_id_df.index.duplicated().sum())
-    # print(park_id_df[(park_id_df.copy_status > 0.0)].sort_values(by='sample_id').head(20))
-    # samples = park_id_df.index.intersection(data_df.index)
-    # park_id_df = park_id_df.reindex(samples)
-    # expression_df = data_df.reindex(samples)
-    # print(park_id_df.shape)
-    # print(park_id_df.head())
-    # print(expression_df.shape)
-    # print(expression_df.iloc[:5, :5])
-    hit_class_counts = park_id_df.groupby('num_hits').count().class_name
-    return hit_class_counts
-    # return (class_counts, centroids, distance)
     
-print(get_centroids_and_distance('TP53_BRCA', park_loss_info))
+    # get expression data for samples
+    samples = park_id_df.index.intersection(data_df.index)
+    park_id_df = park_id_df.reindex(samples)
+    hit_class_counts = park_id_df.groupby('num_hits').count().class_name
+    
+    # group by number of hits, then calculate centroids
+    centroids_df = (data_df
+        .reindex(samples)
+        .merge(park_id_df['num_hits'], left_index=True, right_index=True)
+        .groupby('num_hits')
+    )
+    
+    if centroid_method == 'mean':
+        centroids_df = centroids_df.mean()
+    elif centroid_method == 'median':
+        centroids_df = centroids_df.median()
+    else:
+        raise NotImplementedError(
+            'centroid method {} not implemented'.format(centroid_method)
+        )
+    
+    # calculate distance between centroids
+    dist_df = pd.DataFrame(
+        squareform(pdist(centroids_df.values, metric='euclidean')),
+        index=centroids_df.index.copy(),
+        columns=centroids_df.index.copy()
+    )
+    
+    return hit_class_counts, centroids_df, dist_df
+    
+get_centroids_and_distance('TP53_BRCA', park_loss_info, 'median')[2]
+
+
+# In[ ]:
+
+
+
 
