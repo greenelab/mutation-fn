@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# ## Calculate distance between means/medoids of mutation groupings
+# 
+# Our goal is to find an unsupervised way of calculating distance/similarity between our mutation groupings ("none"/"one"/"both") which isn't affected by sample size, to the degree that differentially expressed gene count was (see `4_de_analysis` notebooks).
+# 
+# Here, we'll try the extremely simple method of:
+# 
+# 1) taking the n-dimensional mean (centroid) or median (medoid) of each group  
+# 2) calculating distance between the centroids and using this to define "expression similarity"
+# 
+# We'll try this for a few different feature selection/embedding methods, and for both gene expression and RPPA (protein expression) data.
+
 # In[1]:
 
 
@@ -28,7 +39,7 @@ subset_mad_feats = 100
 
 # ### Load expression data
 # 
-# We'll also subset to the top features by mean absolute deviation, if necessary.
+# We'll also subset to the top features by mean absolute deviation, if that option .
 
 # In[7]:
 
