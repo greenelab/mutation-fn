@@ -39,12 +39,16 @@ get_ipython().run_line_magic('autoreload', '2')
 data_type = 'rppa'
 
 # how to calculate centroids, 'mean' or 'median'
-centroid_method = 'mean'
+centroid_method = 'median'
+
+# preprocessing method, 'none' or 'pca' currently
+preprocessing = 'none'
+# preprocessing = 'pca'
 
 # number of features to subset to, by mean absolute deviation
 # TODO try this in PCA/UMAP space too
-# subset_mad_feats = 100
-subset_mad_feats = None
+subset_feats = None
+# subset_feats = 105
 
 
 # ### Load expression data
@@ -57,23 +61,15 @@ subset_mad_feats = None
 expression_data_file = (
     '/home/jake/research/mpmp/data/tcga_expression_matrix_processed.tsv.gz'
 )
-expression_sample_info = (
-    '/home/jake/research/mpmp/data/sample_info/tcga_expression_sample_identifiers.tsv'
-)
 
 rppa_data_file = (
     '/home/jake/research/mpmp/data/tcga_rppa_matrix_processed.tsv'
 )
-rppa_sample_info = (
-    '/home/jake/research/mpmp/data/sample_info/tcga_rppa_sample_identifiers.tsv'
-)
 
 if data_type == 'expression':
     data_df = pd.read_csv(expression_data_file, sep='\t', index_col=0)
-    sample_info_df = pd.read_csv(expression_data_file, sep='\t', index_col=0)
 elif data_type == 'rppa':
     data_df = pd.read_csv(rppa_data_file, sep='\t', index_col=0)
-    sample_info_df = pd.read_csv(rppa_data_file, sep='\t', index_col=0)
     
 print(data_df.shape)
 data_df.iloc[:5, :5]
@@ -82,24 +78,52 @@ data_df.iloc[:5, :5]
 # In[4]:
 
 
-if subset_mad_feats is not None:
+# if PCA preprocessing is selected, convert raw features to PCs
+# select the number of PCs using subset_feats
+if preprocessing == 'pca':
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    
+    # standardize features first
+    data_df = pd.DataFrame(
+        StandardScaler().fit_transform(data_df),
+        index=data_df.index.copy(),
+        columns=data_df.columns.copy()
+    )
+    
+    # then transform using PCA
+    pca = PCA(n_components=subset_feats)
+    data_df = pd.DataFrame(
+        pca.fit_transform(data_df),
+        index=data_df.index.copy(),
+        columns=['PC{}'.format(i) for i in range(subset_feats)]
+    )
+    
+data_df.iloc[:5, :5]
+
+
+# In[5]:
+
+
+# if no preprocessing, subset features by mean absolute deviation
+if preprocessing == 'none' and subset_feats is not None:
     mad_ranking = (
         data_df.mad(axis=0)
                .sort_values(ascending=False)
     )
-    top_feats = mad_ranking[:subset_mad_feats].index.astype(str).values
+    top_feats = mad_ranking[:subset_feats].index.astype(str).values
     print(top_feats[:5])
     data_df = data_df.reindex(top_feats, axis='columns')
     
 print(data_df.shape)
-data_df.head()
+data_df.iloc[:5, :5]
 
 
 # ### Load Park et al. "hit" data
 # 
 # This was collated/formatted in `0_process_park.ipynb`
 
-# In[5]:
+# In[6]:
 
 
 with open(cfg.distance_gain_info, 'rb') as f:
@@ -108,7 +132,7 @@ with open(cfg.distance_gain_info, 'rb') as f:
 park_gain_info['TP53_BRCA'].head()
 
 
-# In[6]:
+# In[7]:
 
 
 with open(cfg.distance_loss_info, 'rb') as f:
@@ -119,7 +143,7 @@ park_loss_info['TP53_BRCA'].head()
 
 # ### Calculate distance between means/medians for given gene + cancer type
 
-# In[7]:
+# In[8]:
 
 
 from scipy.spatial.distance import pdist, squareform
@@ -189,7 +213,7 @@ get_centroids_and_distance('TP53_BRCA',
 # Class 3 = only look at gain (should be one-hit here)  
 # Class 4 = look at both loss and gain (should be one-hit in both)
 
-# In[8]:
+# In[9]:
 
 
 class_counts_df = {}
@@ -239,14 +263,14 @@ print(class_counts_loss_df.shape)
 class_counts_loss_df.head()
 
 
-# In[9]:
+# In[10]:
 
 
 print(results_loss_df.shape)
 results_loss_df.head()
 
 
-# In[10]:
+# In[11]:
 
 
 class_counts_df = {}
@@ -296,7 +320,7 @@ print(class_counts_gain_df.shape)
 class_counts_gain_df.head()
 
 
-# In[11]:
+# In[12]:
 
 
 print(results_gain_df.shape)
@@ -307,7 +331,7 @@ results_gain_df.head()
 # 
 # To make our plots, we'll just get rid of NaN rows (i.e. genes/cancer types that don't have at least one sample in each "hit" category).
 
-# In[12]:
+# In[13]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -329,7 +353,7 @@ for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
     ax.set_xlim(-10, 500)
 
 
-# In[13]:
+# In[14]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -352,7 +376,7 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
     ax.set_ylim(0.0, 0.03)
 
 
-# In[14]:
+# In[15]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -373,12 +397,17 @@ for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
     )
     sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
                 order=['none/one', 'both/one', 'both/none'])
-    ax.set_ylim(0, 12)
+    if data_type == 'rppa':
+        ax.set_ylim(0, 12)
+    elif preprocessing == 'pca':
+        ax.set_ylim(0, 180)
+    elif data_type == 'expression':
+        ax.set_ylim(0, 1.75e6)
     ax.set_title('Average {} distance for {} genes, copy loss, {} data'.format(
                    centroid_method, class_name, data_type))
 
 
-# In[15]:
+# In[16]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -399,7 +428,12 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
     )
     sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
                 order=['none/one', 'both/one', 'both/none'])
-    ax.set_ylim(0, 12)
+    if data_type == 'rppa':
+        ax.set_ylim(0, 12)
+    elif preprocessing == 'pca':
+        ax.set_ylim(0, 140)
+    elif data_type == 'expression':
+        ax.set_ylim(0, 1.75e6)
     ax.set_title('Average {} distance for {} genes, copy gain, {} data'.format(
                    centroid_method, class_name, data_type))
 
