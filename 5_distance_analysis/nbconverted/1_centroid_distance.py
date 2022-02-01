@@ -43,7 +43,8 @@ centroid_method = 'mean'
 
 # number of features to subset to, by mean absolute deviation
 # TODO try this in PCA/UMAP space too
-subset_mad_feats = 100
+# subset_mad_feats = 100
+subset_mad_feats = None
 
 
 # ### Load expression data
@@ -303,3 +304,102 @@ results_gain_df.head()
 
 
 # ### Plot centroid distance results
+# 
+# To make our plots, we'll just get rid of NaN rows (i.e. genes/cancer types that don't have at least one sample in each "hit" category).
+
+# In[12]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2)
+
+# plot class counts distributions for copy loss
+for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (class_counts_loss_df[class_counts_loss_df.class_name == class_name]
+      .drop(columns='class_name')
+      .dropna(axis='index')
+      .reset_index()
+      .rename(columns={'index': 'identifier'})
+      .melt(id_vars='identifier', value_name='count', var_name='num_hits')
+    )
+    sns.kdeplot(data=plot_df, x='count', hue='num_hits', ax=ax)
+    ax.set_xlim(-10, 500)
+
+
+# In[13]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2)
+
+# plot class counts distributions for copy gain
+for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (class_counts_gain_df[class_counts_gain_df.class_name == class_name]
+      .drop(columns='class_name')
+      .dropna(axis='index')
+      .reset_index()
+      .rename(columns={'index': 'identifier'})
+      .melt(id_vars='identifier', value_name='count', var_name='num_hits')
+    )
+    sns.kdeplot(data=plot_df, x='count', hue='num_hits', ax=ax)
+    ax.set_xlim(-10, 500)
+    ax.set_ylim(0.0, 0.03)
+
+
+# In[14]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2)
+
+# plot copy loss results here
+for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_loss_df[results_loss_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
+                order=['none/one', 'both/one', 'both/none'])
+    ax.set_ylim(0, 12)
+    ax.set_title('Average {} distance for {} genes, copy loss, {} data'.format(
+                   centroid_method, class_name, data_type))
+
+
+# In[15]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2)
+
+# plot copy gain results here
+for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_gain_df[results_gain_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
+                order=['none/one', 'both/one', 'both/none'])
+    ax.set_ylim(0, 12)
+    ax.set_title('Average {} distance for {} genes, copy gain, {} data'.format(
+                   centroid_method, class_name, data_type))
+
