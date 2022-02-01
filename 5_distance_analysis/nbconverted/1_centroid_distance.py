@@ -21,6 +21,8 @@ import itertools as it
 
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import sys; sys.path.append('..')
 import config as cfg
@@ -116,7 +118,7 @@ park_loss_info['TP53_BRCA'].head()
 
 # ### Calculate distance between means/medians for given gene + cancer type
 
-# In[19]:
+# In[7]:
 
 
 from scipy.spatial.distance import pdist, squareform
@@ -175,14 +177,14 @@ get_centroids_and_distance('TP53_BRCA',
                            'median')
 
 
-# ### Average distance between "hits", per class
+# ### Calculate centroid distance between "hits", per class
 # 
 # Class 1 = look at both loss and gain (should be one-hit in neither)  
 # Class 2 = only look at loss (should be one-hit here)  
 # Class 3 = only look at gain (should be one-hit here)  
 # Class 4 = look at both loss and gain (should be one-hit in both)
 
-# In[20]:
+# In[8]:
 
 
 class_counts_df = {}
@@ -190,6 +192,7 @@ results_df = {}
 counts_columns = None
 results_columns = None
 
+# get distances for copy loss, for class 1/2/4 genes
 for identifier, loss_df in park_loss_info.items():
     
     if loss_df.head(1).class_name.values[0] == 'class 3':
@@ -208,25 +211,77 @@ for identifier, loss_df in park_loss_info.items():
     class_counts_df[identifier] = results[2]
     results_df[identifier] = results[3]
     
-class_counts_df = pd.DataFrame(
+class_counts_loss_df = pd.DataFrame(
     class_counts_df.values(),
     index=class_counts_df.keys(),
     columns=counts_columns
 )
     
-results_df = pd.DataFrame(
+results_loss_df = pd.DataFrame(
     results_df.values(),
     index=results_df.keys(),
     columns=results_columns
 )
     
-print(class_counts_df.shape)
-class_counts_df.head()
+print(class_counts_loss_df.shape)
+class_counts_loss_df.head()
 
 
-# In[21]:
+# In[9]:
 
 
-print(results_df.shape)
-results_df.head()
+print(results_loss_df.shape)
+results_loss_df.head()
 
+
+# In[10]:
+
+
+class_counts_df = {}
+results_df = {}
+counts_columns = None
+results_columns = None
+
+# get distances for copy gain, for class 1/3/4 genes
+for identifier, gain_df in park_gain_info.items():
+    
+    if gain_df.head(1).class_name.values[0] == 'class 2':
+        continue
+        
+    results = get_centroids_and_distance(identifier, gain_df, 'mean')
+    
+    if counts_columns is None:
+        counts_columns = results[0]
+    else:
+        assert counts_columns == results[0]
+        
+    if results_columns is None:
+        results_columns = ['{}/{}'.format(i, j) for i, j in results[1]]
+            
+    class_counts_df[identifier] = results[2]
+    results_df[identifier] = results[3]
+    
+class_counts_gain_df = pd.DataFrame(
+    class_counts_df.values(),
+    index=class_counts_df.keys(),
+    columns=counts_columns
+)
+    
+results_gain_df = pd.DataFrame(
+    results_df.values(),
+    index=results_df.keys(),
+    columns=results_columns
+)
+    
+print(class_counts_gain_df.shape)
+class_counts_gain_df.head()
+
+
+# In[11]:
+
+
+print(results_gain_df.shape)
+results_gain_df.head()
+
+
+# ### Plot centroid distance results
