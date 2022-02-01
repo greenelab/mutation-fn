@@ -127,6 +127,7 @@ def get_centroids_and_distance(identifier, info_df, centroid_method='mean'):
     
     groups = ['both', 'none', 'one']
     group_combinations = list(it.combinations(groups, 2))
+    class_name = info_df['class_name'].values[0]
     
     # get expression data for samples
     samples = info_df.index.intersection(data_df.index)
@@ -170,7 +171,10 @@ def get_centroids_and_distance(identifier, info_df, centroid_method='mean'):
             cmb_ix = dist_combinations.index(cmb)
             ordered_dists.append(dists[cmb_ix])
     
-    return groups, group_combinations, class_counts, ordered_dists
+    return (groups,
+            group_combinations,
+            class_counts,
+            ordered_dists)
     
 get_centroids_and_distance('TP53_BRCA',
                            park_loss_info['TP53_BRCA'],
@@ -189,13 +193,15 @@ get_centroids_and_distance('TP53_BRCA',
 
 class_counts_df = {}
 results_df = {}
+class_names = {}
 counts_columns = None
 results_columns = None
 
 # get distances for copy loss, for class 1/2/4 genes
 for identifier, loss_df in park_loss_info.items():
     
-    if loss_df.head(1).class_name.values[0] == 'class 3':
+    class_name = loss_df.head(1).class_name.values[0]
+    if class_name == 'class 3':
         continue
         
     results = get_centroids_and_distance(identifier, loss_df, 'mean')
@@ -208,19 +214,24 @@ for identifier, loss_df in park_loss_info.items():
     if results_columns is None:
         results_columns = ['{}/{}'.format(i, j) for i, j in results[1]]
             
+    class_names[identifier] = class_name
     class_counts_df[identifier] = results[2]
     results_df[identifier] = results[3]
     
-class_counts_loss_df = pd.DataFrame(
-    class_counts_df.values(),
-    index=class_counts_df.keys(),
-    columns=counts_columns
+class_counts_loss_df = (
+    pd.DataFrame(class_counts_df.values(),
+                 index=class_counts_df.keys(),
+                 columns=counts_columns)
+      .merge(pd.Series(class_names).rename('class_name'),
+             left_index=True, right_index=True)
 )
     
-results_loss_df = pd.DataFrame(
-    results_df.values(),
-    index=results_df.keys(),
-    columns=results_columns
+results_loss_df = (
+    pd.DataFrame(results_df.values(),
+                 index=results_df.keys(),
+                 columns=results_columns)
+      .merge(pd.Series(class_names).rename('class_name'),
+             left_index=True, right_index=True)
 )
     
 print(class_counts_loss_df.shape)
@@ -239,13 +250,15 @@ results_loss_df.head()
 
 class_counts_df = {}
 results_df = {}
+class_names = {}
 counts_columns = None
 results_columns = None
 
 # get distances for copy gain, for class 1/3/4 genes
 for identifier, gain_df in park_gain_info.items():
     
-    if gain_df.head(1).class_name.values[0] == 'class 2':
+    class_name = gain_df.head(1).class_name.values[0]
+    if class_name == 'class 2':
         continue
         
     results = get_centroids_and_distance(identifier, gain_df, 'mean')
@@ -258,19 +271,24 @@ for identifier, gain_df in park_gain_info.items():
     if results_columns is None:
         results_columns = ['{}/{}'.format(i, j) for i, j in results[1]]
             
+    class_names[identifier] = class_name
     class_counts_df[identifier] = results[2]
     results_df[identifier] = results[3]
     
-class_counts_gain_df = pd.DataFrame(
-    class_counts_df.values(),
-    index=class_counts_df.keys(),
-    columns=counts_columns
+class_counts_gain_df = (
+    pd.DataFrame(class_counts_df.values(),
+                 index=class_counts_df.keys(),
+                 columns=counts_columns)
+      .merge(pd.Series(class_names).rename('class_name'),
+             left_index=True, right_index=True)
 )
     
-results_gain_df = pd.DataFrame(
-    results_df.values(),
-    index=results_df.keys(),
-    columns=results_columns
+results_gain_df = (
+    pd.DataFrame(results_df.values(),
+                 index=results_df.keys(),
+                 columns=results_columns)
+      .merge(pd.Series(class_names).rename('class_name'),
+             left_index=True, right_index=True)
 )
     
 print(class_counts_gain_df.shape)
