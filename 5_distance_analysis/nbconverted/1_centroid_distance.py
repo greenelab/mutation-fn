@@ -17,8 +17,10 @@
 
 from pathlib import Path
 import pickle as pkl
+import itertools as it
 
 import pandas as pd
+import numpy as np
 
 import sys; sys.path.append('..')
 import config as cfg
@@ -114,24 +116,33 @@ park_loss_info['TP53_BRCA'].head()
 
 # ### Calculate distance between means/medians for given gene + cancer type
 
-# In[25]:
+# In[19]:
 
 
 from scipy.spatial.distance import pdist, squareform
 
-def get_centroids_and_distance(identifier, info_map, centroid_method='mean'):
-    # get sample mutation info and class counts
-    park_id_df = info_map[identifier]
+def get_centroids_and_distance(identifier, info_df, centroid_method='mean'):
+    
+    groups = ['both', 'none', 'one']
+    group_combinations = list(it.combinations(groups, 2))
     
     # get expression data for samples
-    samples = park_id_df.index.intersection(data_df.index)
-    park_id_df = park_id_df.reindex(samples)
-    hit_class_counts = park_id_df.groupby('num_hits').count().class_name
+    samples = info_df.index.intersection(data_df.index)
+    info_df = info_df.reindex(samples)
+    
+    # if one group has no samples, we have to make sure to assign it 0 count
+    class_counts = []
+    hit_class_counts = info_df.groupby('num_hits').count().class_name
+    for group in groups:
+        if group in hit_class_counts.index:
+            class_counts.append(hit_class_counts[group])
+        else:
+            class_counts.append(0)
     
     # group by number of hits, then calculate centroids
     centroids_df = (data_df
         .reindex(samples)
-        .merge(park_id_df['num_hits'], left_index=True, right_index=True)
+        .merge(info_df['num_hits'], left_index=True, right_index=True)
         .groupby('num_hits')
     )
     
@@ -145,19 +156,77 @@ def get_centroids_and_distance(identifier, info_map, centroid_method='mean'):
         )
     
     # calculate distance between centroids
-    dist_df = pd.DataFrame(
-        squareform(pdist(centroids_df.values, metric='euclidean')),
-        index=centroids_df.index.copy(),
-        columns=centroids_df.index.copy()
-    )
+    # make sure this is in the same order for each identifier, and
+    # handle NA distances here (if one group doesn't have any samples)
+    dists = pdist(centroids_df.values, metric='euclidean')
+    dist_combinations = list(it.combinations(hit_class_counts.index, 2))
+    ordered_dists = []
+    for cmb in group_combinations:
+        if cmb not in dist_combinations:
+            ordered_dists.append(np.nan)
+        else:
+            cmb_ix = dist_combinations.index(cmb)
+            ordered_dists.append(dists[cmb_ix])
     
-    return hit_class_counts, centroids_df, dist_df
+    return groups, group_combinations, class_counts, ordered_dists
     
-get_centroids_and_distance('TP53_BRCA', park_loss_info, 'median')[2]
+get_centroids_and_distance('TP53_BRCA',
+                           park_loss_info['TP53_BRCA'],
+                           'median')
 
 
-# In[ ]:
+# ### Average distance between "hits", per class
+# 
+# Class 1 = look at both loss and gain (should be one-hit in neither)  
+# Class 2 = only look at loss (should be one-hit here)  
+# Class 3 = only look at gain (should be one-hit here)  
+# Class 4 = look at both loss and gain (should be one-hit in both)
+
+# In[20]:
 
 
+class_counts_df = {}
+results_df = {}
+counts_columns = None
+results_columns = None
 
+for identifier, loss_df in park_loss_info.items():
+    
+    if loss_df.head(1).class_name.values[0] == 'class 3':
+        continue
+        
+    results = get_centroids_and_distance(identifier, loss_df, 'mean')
+    
+    if counts_columns is None:
+        counts_columns = results[0]
+    else:
+        assert counts_columns == results[0]
+        
+    if results_columns is None:
+        results_columns = ['{}/{}'.format(i, j) for i, j in results[1]]
+            
+    class_counts_df[identifier] = results[2]
+    results_df[identifier] = results[3]
+    
+class_counts_df = pd.DataFrame(
+    class_counts_df.values(),
+    index=class_counts_df.keys(),
+    columns=counts_columns
+)
+    
+results_df = pd.DataFrame(
+    results_df.values(),
+    index=results_df.keys(),
+    columns=results_columns
+)
+    
+print(class_counts_df.shape)
+class_counts_df.head()
+
+
+# In[21]:
+
+
+print(results_df.shape)
+results_df.head()
 
