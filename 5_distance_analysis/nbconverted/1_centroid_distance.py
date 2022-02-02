@@ -31,6 +31,10 @@ get_ipython().run_line_magic('load_ext', 'autoreload')
 get_ipython().run_line_magic('autoreload', '2')
 
 
+# ### Notebook parameters
+# 
+# These control which type of data to use, how to preprocess the data, how to calculate the centroid distances, etc.
+
 # In[2]:
 
 
@@ -42,13 +46,17 @@ data_type = 'rppa'
 centroid_method = 'median'
 
 # preprocessing method, 'none' or 'pca' currently
-preprocessing = 'none'
-# preprocessing = 'pca'
+# preprocessing = 'none'
+preprocessing = 'pca'
 
 # number of features to subset to, by mean absolute deviation
 # TODO try this in PCA/UMAP space too
-subset_feats = None
-# subset_feats = 105
+# subset_feats = None
+subset_feats = 50
+
+# number of samples to require in each "hit" grouping, None = no minimum
+# min_sample_count = None
+min_sample_count = 15
 
 
 # ### Load expression data
@@ -266,11 +274,28 @@ class_counts_loss_df.head()
 # In[10]:
 
 
+if min_sample_count is not None:
+    valid_rows = (class_counts_loss_df
+        .drop(columns=['class_name'])
+        .astype(int) 
+        > min_sample_count
+    ).all(axis=1)
+    print('Valid rows:', valid_rows.sum(), '/', class_counts_loss_df.shape[0])
+    valid_ids = class_counts_loss_df.index[valid_rows]
+    valid_ids[:5]
+
+
+# In[11]:
+
+
+if min_sample_count is not None:
+    results_loss_df = results_loss_df.loc[valid_ids, :]
+    
 print(results_loss_df.shape)
 results_loss_df.head()
 
 
-# In[11]:
+# In[12]:
 
 
 class_counts_df = {}
@@ -320,9 +345,26 @@ print(class_counts_gain_df.shape)
 class_counts_gain_df.head()
 
 
-# In[12]:
+# In[13]:
 
 
+if min_sample_count is not None:
+    valid_rows = (class_counts_gain_df
+        .drop(columns=['class_name'])
+        .astype(int) 
+        > min_sample_count
+    ).all(axis=1)
+    print('Valid rows:', valid_rows.sum(), '/', class_counts_gain_df.shape[0])
+    valid_ids = class_counts_gain_df.index[valid_rows]
+    valid_ids[:5]
+
+
+# In[14]:
+
+
+if min_sample_count is not None:
+    results_gain_df = results_gain_df.loc[valid_ids, :]
+    
 print(results_gain_df.shape)
 results_gain_df.head()
 
@@ -331,7 +373,7 @@ results_gain_df.head()
 # 
 # To make our plots, we'll just get rid of NaN rows (i.e. genes/cancer types that don't have at least one sample in each "hit" category).
 
-# In[13]:
+# In[15]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -353,7 +395,7 @@ for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
     ax.set_xlim(-10, 500)
 
 
-# In[14]:
+# In[16]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -376,7 +418,7 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
     ax.set_ylim(0.0, 0.03)
 
 
-# In[15]:
+# In[17]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -397,17 +439,20 @@ for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
     )
     sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
                 order=['none/one', 'both/one', 'both/none'])
-    if data_type == 'rppa':
-        ax.set_ylim(0, 12)
-    elif preprocessing == 'pca':
-        ax.set_ylim(0, 180)
+    if preprocessing == 'pca':
+        if data_type == 'expression':
+            ax.set_ylim(0, 180)
+        elif data_type == 'rppa':
+            ax.set_ylim(0, 20)
+    elif data_type == 'rppa':
+        ax.set_ylim(0, 15)
     elif data_type == 'expression':
         ax.set_ylim(0, 1.75e6)
-    ax.set_title('Average {} distance for {} genes, copy loss, {} data'.format(
+    ax.set_title('Distributions of {} distance for {} genes, copy loss, {} data'.format(
                    centroid_method, class_name, data_type))
 
 
-# In[16]:
+# In[18]:
 
 
 sns.set({'figure.figsize': (18, 12)})
@@ -428,12 +473,209 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
     )
     sns.boxplot(data=plot_df, x='num_hits', y='distance', ax=ax,
                 order=['none/one', 'both/one', 'both/none'])
-    if data_type == 'rppa':
-        ax.set_ylim(0, 12)
-    elif preprocessing == 'pca':
-        ax.set_ylim(0, 140)
+    if preprocessing == 'pca':
+        if data_type == 'expression':
+            ax.set_ylim(0, 180)
+        elif data_type == 'rppa':
+            ax.set_ylim(0, 20)
+    elif data_type == 'rppa':
+        ax.set_ylim(0, 15)
     elif data_type == 'expression':
         ax.set_ylim(0, 1.75e6)
-    ax.set_title('Average {} distance for {} genes, copy gain, {} data'.format(
+    ax.set_title('Distributions of {} distance for {} genes, copy gain, {} data'.format(
                    centroid_method, class_name, data_type))
+
+
+# ### Individual examples
+# 
+# Even though the overall results don't really meet our expectations, are there examples of genes/cancer types that do?
+# 
+# First, we'll look at genes that have greater "none/one" distance than "one/both" distance. This should indicate a "one-hit" gene; e.g. a single mutation or CNV "hit" changes the gene expression profile substantially.
+
+# In[19]:
+
+
+one_hit_gain_df = results_gain_df[(results_gain_df['none/one'] > results_gain_df['both/one'])]
+print(one_hit_gain_df.shape)
+one_hit_gain_df.head(10)
+
+
+# In[20]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2, sharey=True)
+
+# plot copy loss results here
+for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_gain_df[results_gain_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    for identifier in plot_df.identifier:
+        if identifier in one_hit_gain_df.index:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', color='red', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+            eps = 0.05
+            ax.annotate(
+                identifier,
+                (2+eps, plot_df.loc[(plot_df.identifier == identifier) &
+                                    (plot_df.num_hits == 'both/none'), 'distance'].values[0]+eps)
+            )
+        else:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+        
+    ax.set_title('{} distance for {} genes, copy gain, {} data'.format(
+                   centroid_method.capitalize(), class_name, data_type))
+
+
+# In[21]:
+
+
+one_hit_loss_df = results_loss_df[(results_loss_df['none/one'] > results_loss_df['both/one'])]
+print(one_hit_loss_df.shape)
+one_hit_loss_df.head(10)
+
+
+# In[22]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2, sharey=True)
+
+# plot copy loss results here
+for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_loss_df[results_loss_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    for identifier in plot_df.identifier:
+        if identifier in one_hit_loss_df.index:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', color='red', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+            eps = 0.05
+            ax.annotate(
+                identifier,
+                (2+eps, plot_df.loc[(plot_df.identifier == identifier) &
+                                    (plot_df.num_hits == 'both/none'), 'distance'].values[0]+eps)
+            )
+        else:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+    ax.set_title('{} distance for {} genes, copy loss, {} data'.format(
+                   centroid_method.capitalize(), class_name, data_type))
+
+
+# Next, we can look at genes that have greater "one/both" distance than "none/one" distance. This should indicate a "two-hit" gene; e.g. a mutation in conjunction with a CNV "hit" changes the gene expression profile more substantially than either change alone.
+
+# In[23]:
+
+
+two_hit_gain_df = results_gain_df[(results_gain_df['both/one'] > results_gain_df['none/one'])]
+print(two_hit_gain_df.shape)
+two_hit_gain_df.head(20)
+
+
+# In[24]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2, sharey=True)
+
+# plot copy loss results here
+for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_gain_df[results_gain_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    for identifier in plot_df.identifier:
+        if identifier in two_hit_gain_df.index:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', color='red', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+            eps = 0.05
+            ax.annotate(
+                identifier,
+                (2+eps, plot_df.loc[(plot_df.identifier == identifier) &
+                                    (plot_df.num_hits == 'both/none'), 'distance'].values[0]+eps)
+            )
+        else:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+        
+    ax.set_title('{} distance for {} genes, copy gain, {} data'.format(
+                   centroid_method.capitalize(), class_name, data_type))
+
+
+# In[25]:
+
+
+two_hit_loss_df = results_loss_df[(results_loss_df['both/one'] > results_loss_df['none/one'])]
+print(two_hit_loss_df.shape)
+two_hit_loss_df.head(20)
+
+
+# In[26]:
+
+
+sns.set({'figure.figsize': (18, 12)})
+
+fig, axarr = plt.subplots(2, 2, sharey=True)
+
+# plot copy loss results here
+for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
+    ax = axarr[ix // 2, ix % 2]
+    # convert dataframe to long-form to plot it
+    plot_df = (
+        results_loss_df[results_loss_df.class_name == class_name]
+          .drop(columns='class_name')
+          .dropna(axis='index')
+          .reset_index()
+          .rename(columns={'index': 'identifier'})
+          .melt(id_vars='identifier', value_name='distance', var_name='num_hits')
+    )
+    for identifier in plot_df.identifier:
+        if identifier in two_hit_loss_df.index:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', color='red', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+            eps = 0.05
+            ax.annotate(
+                identifier,
+                (2+eps, plot_df.loc[(plot_df.identifier == identifier) &
+                                    (plot_df.num_hits == 'both/none'), 'distance'].values[0]+eps)
+            )
+        else:
+            sns.pointplot(data=plot_df[plot_df.identifier == identifier],
+                          x='num_hits', y='distance', ax=ax,
+                          order=['none/one', 'both/one', 'both/none'])
+    ax.set_title('{} distance for {} genes, copy loss, {} data'.format(
+                   centroid_method.capitalize(), class_name, data_type))
 
