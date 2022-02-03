@@ -3,11 +3,13 @@
 
 # ## Load and process Park et al. data
 # 
-# We'll compute this here, if it's not already saved. It takes a bit to do this so we'll save it to a file.
+# For each sample, we want to compute:
 # 
-# TODO:
-# * refactor duplicated code with 3_park_analysis (lots of this is the same as there)
-# * eventually fix the method in 3_park_analysis, copy gain/loss options there aren't quite right (fixing them here for the distance analysis)
+# * (non-silent) binary mutation status in the gene of interest
+# * binary copy gain/loss status in the gene of interest
+# * what "class" the gene of interest is in (more detail on what this means below)
+# 
+# We'll save this to a file since the preprocessing takes a few minutes, so we can load it quickly in downstream analysis scripts.
 
 # In[1]:
 
@@ -39,7 +41,7 @@ park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
 pancancer_pickle = Path('/home/jake/research/mpmp/data/pancancer_data.pkl')
 
 
-# ### Load data from paper supp. info
+# ### Load data from Park et al. supp. info
 
 # In[3]:
 
@@ -235,8 +237,8 @@ sample_freeze_df.head()
 # * Sample ID, gene/tissue
 # * Mutation status (binary) for sample in gene
 # * CNV status (binary) for sample in gene, gain/loss for oncogene/TSG respectively
-# * Park et al. gene "class" (class 1/2/3/4)
-# * Sample "status" (none/one/both)
+# * Park et al. gene "class" (class 1/2/3/4 as defined above)
+# * Sample "number of hits" (none/one/both)
 
 # In[17]:
 
