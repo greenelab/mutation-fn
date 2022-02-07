@@ -34,28 +34,28 @@ get_ipython().run_line_magic('autoreload', '2')
 # ### Notebook parameters
 # 
 # These control which type of data to use, how to preprocess the data, how to calculate the centroid distances, etc.
+# 
+# Defaults are chosen mostly to make the script run quickly (expression data takes much longer to load and preprocess), although they seem to be somewhat representative of the overall results.
 
 # In[2]:
 
 
 # whether to use expression or rppa data
-# data_type = 'expression'
 data_type = 'rppa'
 
 # how to calculate centroids, 'mean' or 'median'
 centroid_method = 'median'
 
 # preprocessing method, 'none' or 'pca' currently
-# preprocessing = 'none'
 preprocessing = 'pca'
 
-# number of features to subset to, by mean absolute deviation
-# TODO try this in PCA/UMAP space too
-# subset_feats = None
+# number of features to subset to
+# for 'none' preprocessing this is the number of features by MAD
+# (None = no subset by MAD)
+# for 'pca' preprocessing this is the number of PCs to use
 subset_feats = 50
 
 # number of samples to require in each "hit" grouping, None = no minimum
-# min_sample_count = None
 min_sample_count = 15
 
 
@@ -494,6 +494,8 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
                    centroid_method, class_name, data_type))
 
 
+# See [these Google slides](https://docs.google.com/presentation/d/101FFx3vETEMgfeYUOmJSpF8TC69uVqx18vzk27lj6go/edit?usp=sharing) (particularly slide 2) for what we expected to see here. Over a few different parameter settings, and for raw and PCA-processed features, we don't really see what we expected to see. The none/one samples are almost always the closest together (not expected for class 1 genes), and one/both samples are generally quite far apart (again, not expected for class 1 genes), except for class 4 genes where one/both distance is comparable to none/one distance.
+# 
 # ### Individual examples
 # 
 # Even though the overall results don't really meet our expectations, are there examples of genes/cancer types that do?
