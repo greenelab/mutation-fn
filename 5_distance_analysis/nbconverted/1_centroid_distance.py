@@ -162,7 +162,7 @@ def get_centroids_and_distance(identifier, info_df, centroid_method='mean'):
     group_combinations = list(it.combinations(groups, 2))
     class_name = info_df['class_name'].values[0]
     
-    # get expression data for samples
+    # get (gene/protein) expression data for samples
     samples = info_df.index.intersection(data_df.index)
     info_df = info_df.reindex(samples)
     
@@ -490,7 +490,7 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
 # 
 # Even though the overall results don't really meet our expectations, are there examples of genes/cancer types that do?
 # 
-# First, we'll look at genes that have greater "none/one" distance than "one/both" distance. This should indicate a "one-hit" gene; e.g. a single mutation or CNV "hit" changes the gene expression profile substantially.
+# First, we'll look at genes that have greater "none/one" distance than "one/both" distance. This should indicate a "one-hit" gene; e.g. a single mutation or CNV "hit" changes the expression profile (gene expression or protein expression, for RNA-seq and RPPA data respectively) substantially.
 
 # In[19]:
 
