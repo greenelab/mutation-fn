@@ -381,6 +381,8 @@ sns.set({'figure.figsize': (18, 12)})
 fig, axarr = plt.subplots(2, 2)
 
 # plot class counts distributions for copy loss
+# we don't show class 3 genes here because they're defined based on
+# copy gain (they are shown in the next plot)
 for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
     ax = axarr[ix // 2, ix % 2]
     # convert dataframe to long-form to plot it
@@ -392,6 +394,8 @@ for ix, class_name in enumerate(['class 1', 'class 2', 'class 4']):
       .melt(id_vars='identifier', value_name='count', var_name='num_hits')
     )
     sns.kdeplot(data=plot_df, x='count', hue='num_hits', ax=ax)
+    ax.set_title('Distribution of samples having the given number of hits, '
+                 'copy loss, {}'.format(class_name))
     ax.set_xlim(-10, 500)
 
 
@@ -403,6 +407,8 @@ sns.set({'figure.figsize': (18, 12)})
 fig, axarr = plt.subplots(2, 2)
 
 # plot class counts distributions for copy gain
+# we don't show class 2 genes here because they're defined based on
+# copy loss (they were shown in the last plot)
 for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
     ax = axarr[ix // 2, ix % 2]
     # convert dataframe to long-form to plot it
@@ -414,6 +420,8 @@ for ix, class_name in enumerate(['class 1', 'class 3', 'class 4']):
       .melt(id_vars='identifier', value_name='count', var_name='num_hits')
     )
     sns.kdeplot(data=plot_df, x='count', hue='num_hits', ax=ax)
+    ax.set_title('Distribution of samples having the given number of hits, '
+                 'copy gain, {}'.format(class_name))
     ax.set_xlim(-10, 500)
     ax.set_ylim(0.0, 0.03)
 
