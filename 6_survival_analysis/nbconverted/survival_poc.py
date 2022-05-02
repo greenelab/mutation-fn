@@ -12,6 +12,11 @@ from pathlib import Path
 import pickle as pkl
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sksurv.compare import compare_survival
+from sksurv.nonparametric import kaplan_meier_estimator
+from sksurv.util import Surv
 
 import sys; sys.path.append('..')
 import config as cfg
@@ -47,7 +52,7 @@ clinical_df = pd.read_excel(
     engine='openpyxl'
 )
 
-clinical_df.index.rename('sample_id', inplace=True)
+clinical_df.index.rename('patient_id', inplace=True)
 
 # drop numeric index column
 clinical_df.drop(labels=['Unnamed: 0'], axis=1, inplace=True)
@@ -193,4 +198,71 @@ copy_gain_df = (copy_thresh_df
 )
 print(copy_gain_df.shape)
 copy_gain_df.iloc[:5, :5]
+
+
+# ### Compare and visualize survival groups
+
+# In[27]:
+
+
+# get mutation info for target gene
+if CLASSIFICATION == 'Oncogene':
+    binary_mutation_df = (
+        mutation_df.loc[:, GENE] | copy_gain_df.loc[:, GENE]
+    ).astype(int)
+elif CLASSIFICATION == 'TSG':
+    binary_mutation_df = (
+        mutation_df.loc[:, GENE] | copy_loss_df.loc[:, GENE]
+    ).astype(int)
+else:
+    binary_mutation_df = mutation_df.loc[:, GENE]
+    
+# get patient ID from sample IDs
+binary_mutation_df.index = binary_mutation_df.index.str[:12]
+
+binary_mutation_df.head()
+
+
+# In[36]:
+
+
+# join survival and mutation info
+cancer_types = ['LGG', 'GBM']
+
+surv_groups_df = (clinical_df
+    .merge(binary_mutation_df, left_index=True, right_index=True)                 
+    .rename(columns={GENE: '{}_is_mutated'.format(GENE)})
+    .query('type == @cancer_types')
+)
+
+print(surv_groups_df.shape)
+surv_groups_df.head()
+
+
+# In[37]:
+
+
+# plot groups
+sns.set({'figure.figsize': (8, 6)})
+sns.set_style('whitegrid')
+
+mut_col = '{}_is_mutated'.format(GENE)
+
+for is_mutated in surv_groups_df[mut_col].unique():
+    mask_mutated = (surv_groups_df[mut_col] == is_mutated)
+    time_treatment, survival_prob_treatment = kaplan_meier_estimator(
+        surv_groups_df['status'][mask_mutated],
+        surv_groups_df['time_in_days'][mask_mutated]
+    )
+    
+    # TODO: confidence intervals
+    label = '{} mutant'.format(GENE) if is_mutated else '{} wild-type'.format(GENE)
+    plt.step(time_treatment, survival_prob_treatment, where="post", label=label)
+    
+plt.legend()
+    
+# hypothesis testing using log-rank test
+y = Surv.from_dataframe('status', 'time_in_days', surv_groups_df)
+chisq, p_val = compare_survival(y, surv_groups_df[mut_col].values)
+print('chisq = {:.4f}'.format(chisq), 'p = {:.4e}'.format(p_val))
 
