@@ -9,23 +9,35 @@
 
 
 from pathlib import Path
+import pickle as pkl
 
 import pandas as pd
 
+import sys; sys.path.append('..')
+import config as cfg
 
-# ### Get clinical endpoint info
 
 # In[2]:
 
 
+GENE = 'IDH1'
+CLASSIFICATION = 'Oncogene'
+
+MPMP_LOCATION = Path('/home/jake/research/mpmp')
+
+
+# ### Get clinical endpoint info
+
+# In[3]:
+
+
 # use TCGA clinical data downloaded in mpmp repo
-mpmp_location = Path('/home/jake/research/mpmp')
 clinical_filename = (
-    mpmp_location / 'data' / 'raw' / 'TCGA-CDR-SupplementalTableS1.xlsx'
+    MPMP_LOCATION / 'data' / 'raw' / 'TCGA-CDR-SupplementalTableS1.xlsx'
 )
 
 
-# In[3]:
+# In[4]:
 
 
 clinical_df = pd.read_excel(
@@ -48,7 +60,7 @@ print(clinical_df.shape)
 clinical_df.iloc[:5, :5]
 
 
-# In[4]:
+# In[5]:
 
 
 # we want to use overall survival as the target variable except for
@@ -77,4 +89,108 @@ clinical_df.age.fillna(clinical_df.age.mean(), inplace=True)
 
 print(clinical_df.shape)
 clinical_df.head()
+
+
+# ### Get mutated samples info
+# 
+# TODO: make this into a function(s)
+
+# In[6]:
+
+
+# mutation and copy number data
+pancancer_pickle = MPMP_LOCATION / 'data' / 'pancancer_data.pkl'
+
+with open(pancancer_pickle, 'rb') as f:
+    pancancer_data = pkl.load(f)
+
+
+# In[7]:
+
+
+# get (binary) mutation data
+# 1 = observed non-silent mutation in this gene for this sample, 0 otherwise
+mutation_df = pancancer_data[1]
+print(mutation_df.shape)
+mutation_df.iloc[:5, :5]
+
+
+# In[8]:
+
+
+# we use the data source and preprocessing code from the pancancer repo, here:
+# https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/process_copynumber.py#L21
+
+copy_thresh_df = (
+    pd.read_csv(cfg.data_dir / 'pancan_GISTIC_threshold.tsv',
+                sep='\t', index_col=0)
+      .drop(columns=['Locus ID', 'Cytoband'])
+)
+copy_thresh_df.columns = copy_thresh_df.columns.str[0:15]
+
+# thresholded copy number includes 5 values [-2, -1, 0, 1, 2], which
+# correspond to "deep loss", "moderate loss", "no change",
+# "moderate gain", and "deep gain", respectively.
+print(copy_thresh_df.shape)
+copy_thresh_df.iloc[:5, :5]
+
+
+# In[9]:
+
+
+sample_freeze_df = pancancer_data[0]
+copy_samples = list(
+    set(sample_freeze_df.SAMPLE_BARCODE)
+    .intersection(set(copy_thresh_df.columns))
+)
+print(len(copy_samples))
+
+
+# In[10]:
+
+
+# make sure we're not losing too many samples, a few is fine
+print(sorted(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns)))
+
+
+# In[11]:
+
+
+copy_thresh_df = (copy_thresh_df
+    .T
+    .loc[sorted(copy_samples)]
+    .fillna(0)
+    .astype(int)
+)
+
+print(copy_thresh_df.shape)
+copy_thresh_df.iloc[:5, :5]
+
+
+# In[12]:
+
+
+# here, we want to use "moderate" and "deep" loss/gain to define CNV
+# loss/gain (to match Park et al.)
+#
+# note that this is different to the more conservative approach of using
+# "deep loss/gain" only as in our classifiers
+
+copy_loss_df = (copy_thresh_df
+    .replace(to_replace=[1, 2], value=0)
+    .replace(to_replace=[-1, -2], value=1)
+)
+print(copy_loss_df.shape)
+copy_loss_df.iloc[:5, :5]
+
+
+# In[13]:
+
+
+copy_gain_df = (copy_thresh_df
+    .replace(to_replace=[-1, -2], value=0)
+    .replace(to_replace=[1, 2], value=1)
+)
+print(copy_gain_df.shape)
+copy_gain_df.iloc[:5, :5]
 
