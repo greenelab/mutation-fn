@@ -227,7 +227,7 @@ copy_gain_df.iloc[:5, :5]
 
 # ### Get sample info and groups for gene/cancer type
 
-# In[37]:
+# In[16]:
 
 
 def get_groups_for_gene_and_tissue(identifier,
@@ -279,7 +279,7 @@ def get_groups_for_gene_and_tissue(identifier,
     return id_clinical_df
 
 
-# In[41]:
+# In[17]:
 
 
 # test for a selected example
@@ -294,4 +294,56 @@ print(id_clinical_df.shape)
 print(id_clinical_df.is_mutated.sum(), id_clinical_df.is_mutated_alt.sum())
 print(id_clinical_df.isna().sum()) 
 id_clinical_df.head()
+
+
+# In[18]:
+
+
+# plot groups
+gene, tissue = identifier.split('_')
+
+sns.set({'figure.figsize': (12, 6)})
+sns.set_style('whitegrid')
+
+fig, axarr = plt.subplots(1, 2)
+
+for ix, mut_col in enumerate(['is_mutated', 'is_mutated_alt']):
+    
+    ax = axarr[ix]
+    
+    n_mutant = id_clinical_df[mut_col].sum()
+    n_wildtype = id_clinical_df.shape[0] - n_mutant
+    
+    for is_mutated in id_clinical_df[mut_col].unique():
+        mask_mutated = (id_clinical_df[mut_col] == is_mutated)
+        time_treatment, survival_prob_treatment = kaplan_meier_estimator(
+            id_clinical_df['status'][mask_mutated],
+            id_clinical_df['time_in_days'][mask_mutated]
+        )
+        
+        def get_label(gene, is_mutated, n_mutant, n_wildtype):
+            if is_mutated:
+                return '{} mutant (n={})'.format(gene, n_mutant)
+            else:
+                return '{} wild-type (n={})'.format(gene, n_wildtype)
+    
+        # TODO: confidence intervals
+        ax.step(time_treatment, survival_prob_treatment, where="post",
+                label=get_label(gene, is_mutated, n_mutant, n_wildtype))
+        
+    ax.legend()
+    
+    def get_n_hits(hits_class, ix):
+        hits_desc = (['one', 'two'] if hits_class == 'one' else ['two', 'one'])
+        return hits_desc[ix]
+            
+    ax.set_title('Survival for {}-hit classification'.format(
+        get_n_hits(hits_classification, ix)))
+    
+    # hypothesis testing using log-rank test
+    y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
+    chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
+    print(mut_col, 'chisq = {:.4f}'.format(chisq), 'p = {:.4f}'.format(p_val))
+    
+plt.suptitle('Comparing mutation classes for {}'.format(identifier))
 
