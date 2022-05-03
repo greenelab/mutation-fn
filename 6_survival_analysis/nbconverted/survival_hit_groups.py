@@ -300,50 +300,196 @@ id_clinical_df.head()
 
 
 # plot groups
-gene, tissue = identifier.split('_')
+sns.set({'figure.figsize': (12, 6)})
+sns.set_style('whitegrid')
+
+fig, axarr = plt.subplots(1, 2)
+
+def plot_id(identifier, id_clinical_df):
+    
+    gene, tissue = identifier.split('_')
+
+    for ix, mut_col in enumerate(['is_mutated', 'is_mutated_alt']):
+
+        ax = axarr[ix]
+
+        n_mutant = id_clinical_df[mut_col].sum()
+        n_wildtype = id_clinical_df.shape[0] - n_mutant
+
+        for is_mutated in id_clinical_df[mut_col].unique():
+            mask_mutated = (id_clinical_df[mut_col] == is_mutated)
+            time_treatment, survival_prob_treatment = kaplan_meier_estimator(
+                id_clinical_df['status'][mask_mutated],
+                id_clinical_df['time_in_days'][mask_mutated]
+            )
+
+            def get_label(gene, is_mutated, n_mutant, n_wildtype):
+                if is_mutated:
+                    return '{} mutant (n={})'.format(gene, n_mutant)
+                else:
+                    return '{} wild-type (n={})'.format(gene, n_wildtype)
+
+            # TODO: confidence intervals
+            ax.step(time_treatment, survival_prob_treatment, where="post",
+                    label=get_label(gene, is_mutated, n_mutant, n_wildtype))
+
+        ax.legend()
+
+        def get_n_hits(hits_class, ix):
+            hits_desc = (['one', 'two'] if hits_class == 'one' else ['two', 'one'])
+            return hits_desc[ix]
+
+        ax.set_title('Survival for {}-hit classification'.format(
+            get_n_hits(hits_classification, ix)))
+
+        # hypothesis testing using log-rank test
+        y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
+        chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
+        print(mut_col, 'chisq = {:.4f}'.format(chisq), 'p = {:.4e}'.format(p_val))
+
+    plt.suptitle('Comparing mutation classes for {}'.format(identifier))
+    
+plot_id(identifier, id_clinical_df)
+
+
+# ### Run for all "class 2" genes
+# 
+# We'll just start here for now, these are all tumor suppressors that Park et al. have annotated as "two-hit loss" drivers (i.e. classical tumor suppressors).
+# 
+# We want to see how many of them (if any) distinguish between survival groups more effectively for two-hit samples as opposed to one-hit samples (TODO: be a bit clearer with what we're doing here).
+
+# In[19]:
+
+
+class_2_ids = park_loss_sig_df.index.unique()
+print(len(class_2_ids))
+print(class_2_ids[:10])
+
+
+# We want to build a dataframe with:
+# * identifier
+# * \# WT samples
+# * \# mutant samples
+# * survival p-value
+# * \# WT samples (alt classification)
+# * \# mutant samples (alt classification)
+# * survival p-value (alt classification)
+
+# In[20]:
+
+
+class_2_surv_df = []
+columns = [
+    'identifier',
+    'n_mutant',
+    'n_wildtype',
+    'chisq',
+    'p_val',
+    'n_mutant_alt',
+    'n_wildtype_alt',
+    'chisq_alt',
+    'p_val_alt',
+]
+
+for identifier in class_2_ids:
+    
+    results = [identifier]
+    
+    id_clinical_df = get_groups_for_gene_and_tissue(
+        identifier, 'TSG', 'two')
+    
+    for ix, mut_col in enumerate(['is_mutated', 'is_mutated_alt']):
+    
+        n_mutant = id_clinical_df[mut_col].sum()
+        n_wildtype = id_clinical_df.shape[0] - n_mutant
+        
+        if n_mutant == 0 or n_wildtype == 0:
+            print(identifier, mut_col, n_mutant, n_wildtype, file=sys.stderr)
+            continue
+    
+        # hypothesis testing using log-rank test
+        try:
+            y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
+        except ValueError:
+            # this happens for COADREAD, TODO fix it later
+            print(identifier, file=sys.stderr)
+            continue
+        chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
+        results += [n_mutant, n_wildtype, chisq, p_val]
+        
+    if len(results) == len(columns):
+        class_2_surv_df.append(results)
+        
+class_2_surv_df = pd.DataFrame(
+    class_2_surv_df,
+    columns=columns
+)
+class_2_surv_df.set_index('identifier')
+
+class_2_surv_df['ts_diff'] = class_2_surv_df.chisq - class_2_surv_df.chisq_alt
+class_2_surv_df['p_val_diff'] = class_2_surv_df.p_val - class_2_surv_df.p_val_alt
+
+print(class_2_surv_df.shape)
+class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
+
+
+# In[21]:
+
+
+sns.set({'figure.figsize': (10, 8)})
+fig, axarr = plt.subplots(2, 1)
+
+sns.kdeplot(data=class_2_surv_df.ts_diff, ax=axarr[0])
+axarr[0].axvline(0, linestyle='--')
+axarr[0].set_title('Test statistic diff, class 2 genes')
+axarr[0].set_xlabel('TS(true labeling) - TS(alt labeling)')
+
+metric = 'ts'
+num_examples = 10
+
+top_df = (class_2_surv_df
+    .sort_values(by='{}_diff'.format(metric), ascending=False)
+    .head(num_examples)
+)
+bottom_df = (class_2_surv_df
+    .sort_values(by='{}_diff'.format(metric), ascending=False)
+    .tail(num_examples)
+)
+plot_df = pd.concat((top_df, bottom_df)).reset_index()
+sns.barplot(data=plot_df, x=plot_df.index, y='{}_diff'.format(metric),
+            dodge=False, ax=axarr[1])
+axarr[1].set_xticks([])
+axarr[1].set_title('Top 10 diffs, class 2 genes')
+axarr[1].set_xlabel('TS(true labeling) - TS(alt labeling)')
+
+def show_values_on_bars(ax):
+    for i in range(plot_df.shape[0]):
+        _x = i
+        _y = plot_df.loc[i, '{}_diff'.format(metric)]
+        val = plot_df.loc[i, 'identifier']
+        if _y > 0:
+            ax.text(_x, _y + 10, val, ha="center", rotation=90) 
+        else:
+            ax.text(_x, _y - 100, val, ha="center", rotation=90)
+            
+axarr[1].set_ylim(-220, 120)
+show_values_on_bars(axarr[1])
+
+plt.tight_layout()
+
+
+# In[25]:
+
 
 sns.set({'figure.figsize': (12, 6)})
 sns.set_style('whitegrid')
 
 fig, axarr = plt.subplots(1, 2)
 
-for ix, mut_col in enumerate(['is_mutated', 'is_mutated_alt']):
-    
-    ax = axarr[ix]
-    
-    n_mutant = id_clinical_df[mut_col].sum()
-    n_wildtype = id_clinical_df.shape[0] - n_mutant
-    
-    for is_mutated in id_clinical_df[mut_col].unique():
-        mask_mutated = (id_clinical_df[mut_col] == is_mutated)
-        time_treatment, survival_prob_treatment = kaplan_meier_estimator(
-            id_clinical_df['status'][mask_mutated],
-            id_clinical_df['time_in_days'][mask_mutated]
-        )
-        
-        def get_label(gene, is_mutated, n_mutant, n_wildtype):
-            if is_mutated:
-                return '{} mutant (n={})'.format(gene, n_mutant)
-            else:
-                return '{} wild-type (n={})'.format(gene, n_wildtype)
-    
-        # TODO: confidence intervals
-        ax.step(time_treatment, survival_prob_treatment, where="post",
-                label=get_label(gene, is_mutated, n_mutant, n_wildtype))
-        
-    ax.legend()
-    
-    def get_n_hits(hits_class, ix):
-        hits_desc = (['one', 'two'] if hits_class == 'one' else ['two', 'one'])
-        return hits_desc[ix]
-            
-    ax.set_title('Survival for {}-hit classification'.format(
-        get_n_hits(hits_classification, ix)))
-    
-    # hypothesis testing using log-rank test
-    y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
-    chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
-    print(mut_col, 'chisq = {:.4f}'.format(chisq), 'p = {:.4f}'.format(p_val))
-    
-plt.suptitle('Comparing mutation classes for {}'.format(identifier))
+identifier = 'TP53_HNSC'
+
+id_clinical_df = get_groups_for_gene_and_tissue(
+    identifier, 'TSG', 'two')
+
+plot_id(identifier, id_clinical_df)
 
