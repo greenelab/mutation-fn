@@ -41,11 +41,25 @@ park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
 # In[3]:
 
 
+park_loss_df = pd.read_csv(park_loss_data, sep='\t', index_col=0)
+park_loss_df.head()
+
+
+# In[4]:
+
+
+park_gain_df = pd.read_csv(park_gain_data, sep='\t', index_col=0)
+park_gain_df.head()
+
+
+# In[5]:
+
+
 park_loss_sig_df = pd.read_csv(park_loss_sig_data, sep='\t', index_col=0)
 park_loss_sig_df.head()
 
 
-# In[4]:
+# In[6]:
 
 
 park_gain_sig_df = pd.read_csv(park_gain_sig_data, sep='\t', index_col=0)
@@ -58,7 +72,7 @@ park_gain_sig_df.head()
 # 
 # TODO: move this to a function/utilities file
 
-# In[5]:
+# In[7]:
 
 
 # use TCGA clinical data downloaded in mpmp repo
@@ -67,7 +81,7 @@ clinical_filename = (
 )
 
 
-# In[6]:
+# In[8]:
 
 
 clinical_df = pd.read_excel(
@@ -90,7 +104,7 @@ print(clinical_df.shape)
 clinical_df.iloc[:5, :5]
 
 
-# In[7]:
+# In[9]:
 
 
 # we want to use overall survival as the target variable except for
@@ -125,7 +139,7 @@ clinical_df.head()
 # 
 # TODO: move this to a function/utilities file
 
-# In[8]:
+# In[10]:
 
 
 # mutation and copy number data
@@ -135,7 +149,7 @@ with open(pancancer_pickle, 'rb') as f:
     pancancer_data = pkl.load(f)
 
 
-# In[9]:
+# In[11]:
 
 
 # get (binary) mutation data
@@ -145,7 +159,7 @@ print(mutation_df.shape)
 mutation_df.iloc[:5, :5]
 
 
-# In[10]:
+# In[12]:
 
 
 # we use the data source and preprocessing code from the pancancer repo, here:
@@ -165,7 +179,7 @@ print(copy_thresh_df.shape)
 copy_thresh_df.iloc[:5, :5]
 
 
-# In[11]:
+# In[13]:
 
 
 sample_freeze_df = pancancer_data[0]
@@ -176,14 +190,14 @@ copy_samples = list(
 print(len(copy_samples))
 
 
-# In[12]:
+# In[14]:
 
 
 # make sure we're not losing too many samples, a few is fine
 print(sorted(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns)))
 
 
-# In[13]:
+# In[15]:
 
 
 copy_thresh_df = (copy_thresh_df
@@ -197,7 +211,7 @@ print(copy_thresh_df.shape)
 copy_thresh_df.iloc[:5, :5]
 
 
-# In[14]:
+# In[16]:
 
 
 # here, we want to use "moderate" and "deep" loss/gain to define CNV
@@ -214,7 +228,7 @@ print(copy_loss_df.shape)
 copy_loss_df.iloc[:5, :5]
 
 
-# In[15]:
+# In[17]:
 
 
 copy_gain_df = (copy_thresh_df
@@ -227,7 +241,7 @@ copy_gain_df.iloc[:5, :5]
 
 # ### Get sample info and groups for gene/cancer type
 
-# In[16]:
+# In[18]:
 
 
 def get_groups_for_gene_and_tissue(identifier,
@@ -279,13 +293,13 @@ def get_groups_for_gene_and_tissue(identifier,
     return id_clinical_df
 
 
-# In[17]:
+# In[19]:
 
 
 # test for a selected example
-identifier = 'RB1_BLCA'
-cancer_classification = 'TSG'
-hits_classification = 'two'
+identifier = 'IDH1_LGG'
+cancer_classification = 'Oncogene'
+hits_classification = 'one'
 
 id_clinical_df = get_groups_for_gene_and_tissue(
     identifier, cancer_classification, hits_classification)
@@ -296,7 +310,7 @@ print(id_clinical_df.isna().sum())
 id_clinical_df.head()
 
 
-# In[18]:
+# In[20]:
 
 
 # plot groups
@@ -358,7 +372,7 @@ plot_id(identifier, id_clinical_df)
 # 
 # We want to see how many of them (if any) distinguish between survival groups more effectively for two-hit samples as opposed to one-hit samples (TODO: be a bit clearer with what we're doing here).
 
-# In[19]:
+# In[21]:
 
 
 class_2_ids = park_loss_sig_df.index.unique()
@@ -375,7 +389,7 @@ print(class_2_ids[:10])
 # * \# mutant samples (alt classification)
 # * survival p-value (alt classification)
 
-# In[20]:
+# In[22]:
 
 
 class_2_surv_df = []
@@ -433,7 +447,7 @@ print(class_2_surv_df.shape)
 class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
 
-# In[21]:
+# In[23]:
 
 
 sns.set({'figure.figsize': (10, 8)})
@@ -478,7 +492,7 @@ show_values_on_bars(axarr[1])
 plt.tight_layout()
 
 
-# In[25]:
+# In[32]:
 
 
 sns.set({'figure.figsize': (12, 6)})
@@ -487,9 +501,159 @@ sns.set_style('whitegrid')
 fig, axarr = plt.subplots(1, 2)
 
 identifier = 'TP53_HNSC'
+cancer_classification = 'TSG'
+hits_classification = 'two'
 
 id_clinical_df = get_groups_for_gene_and_tissue(
-    identifier, 'TSG', 'two')
+    identifier, cancer_classification, hits_classification)
 
+print(identifier, r'delta TS:', '{:.4f}'.format(class_2_surv_df.loc[class_2_surv_df.identifier == identifier, 'ts_diff'].to_numpy()[0]))
 plot_id(identifier, id_clinical_df)
+
+
+# ### Run for all "class 1" tumor suppressors
+# 
+# TODO: describe
+
+# In[33]:
+
+
+class_1_ids = (
+    park_loss_df[park_loss_df.classification == 'TSG']
+      .index.unique()
+      .difference(park_loss_sig_df.index)
+)
+    
+print(len(class_1_ids))
+print(class_1_ids[:10])
+
+
+# In[37]:
+
+
+class_1_surv_df = []
+columns = [
+    'identifier',
+    'n_mutant',
+    'n_wildtype',
+    'chisq',
+    'p_val',
+    'n_mutant_alt',
+    'n_wildtype_alt',
+    'chisq_alt',
+    'p_val_alt',
+]
+
+for identifier in class_1_ids:
+    
+    results = [identifier]
+    
+    id_clinical_df = get_groups_for_gene_and_tissue(
+        identifier, 'TSG', 'one')
+    
+    for ix, mut_col in enumerate(['is_mutated', 'is_mutated_alt']):
+    
+        n_mutant = id_clinical_df[mut_col].sum()
+        n_wildtype = id_clinical_df.shape[0] - n_mutant
+        
+        if n_mutant < 2 or n_wildtype < 2:
+            # statistical testing won't work in this case so just continue
+            print(identifier, mut_col, n_mutant, n_wildtype, file=sys.stderr)
+            continue
+    
+        # hypothesis testing using log-rank test
+        try:
+            y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
+        except ValueError:
+            # this happens for COADREAD, TODO fix it later
+            print(identifier, file=sys.stderr)
+            continue
+            
+        chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
+        results += [n_mutant, n_wildtype, chisq, p_val]
+        
+    if len(results) == len(columns):
+        class_1_surv_df.append(results)
+        
+class_1_surv_df = pd.DataFrame(
+    class_1_surv_df,
+    columns=columns
+)
+class_1_surv_df.set_index('identifier')
+
+class_1_surv_df['ts_diff'] = class_1_surv_df.chisq - class_1_surv_df.chisq_alt
+class_1_surv_df['p_val_diff'] = class_1_surv_df.p_val - class_1_surv_df.p_val_alt
+
+print(class_1_surv_df.shape)
+class_1_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
+
+
+# In[38]:
+
+
+sns.set({'figure.figsize': (10, 8)})
+fig, axarr = plt.subplots(2, 1)
+
+sns.kdeplot(data=class_1_surv_df.ts_diff, ax=axarr[0])
+axarr[0].axvline(0, linestyle='--')
+axarr[0].set_title('Test statistic diff, class 1 genes')
+axarr[0].set_xlabel('TS(true labeling) - TS(alt labeling)')
+
+metric = 'ts'
+num_examples = 10
+
+top_df = (class_1_surv_df
+    .sort_values(by='{}_diff'.format(metric), ascending=False)
+    .head(num_examples)
+)
+bottom_df = (class_1_surv_df
+    .sort_values(by='{}_diff'.format(metric), ascending=False)
+    .tail(num_examples)
+)
+plot_df = pd.concat((top_df, bottom_df)).reset_index()
+sns.barplot(data=plot_df, x=plot_df.index, y='{}_diff'.format(metric),
+            dodge=False, ax=axarr[1])
+axarr[1].set_xticks([])
+axarr[1].set_title('Top 10 diffs, class 1 genes')
+axarr[1].set_xlabel('TS(true labeling) - TS(alt labeling)')
+
+def show_values_on_bars(ax):
+    for i in range(plot_df.shape[0]):
+        _x = i
+        _y = plot_df.loc[i, '{}_diff'.format(metric)]
+        val = plot_df.loc[i, 'identifier']
+        if _y > 0:
+            ax.text(_x, _y + 10, val, ha="center", rotation=90) 
+        else:
+            ax.text(_x, _y - 100, val, ha="center", rotation=90)
+            
+axarr[1].set_ylim(-220, 120)
+show_values_on_bars(axarr[1])
+
+plt.tight_layout()
+
+
+# In[45]:
+
+
+sns.set({'figure.figsize': (12, 6)})
+sns.set_style('whitegrid')
+
+fig, axarr = plt.subplots(1, 2)
+
+identifier = 'BAP1_KIRC'
+cancer_classification = 'TSG'
+hits_classification = 'one'
+
+id_clinical_df = get_groups_for_gene_and_tissue(
+    identifier, cancer_classification, hits_classification)
+
+print(identifier, r'delta TS:', '{:.4f}'.format(class_1_surv_df.loc[class_1_surv_df.identifier == identifier, 'ts_diff'].to_numpy()[0]))
+plot_id(identifier, id_clinical_df)
+
+
+# In[ ]:
+
+
+
 
