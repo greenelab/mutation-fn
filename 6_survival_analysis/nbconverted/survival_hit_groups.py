@@ -35,6 +35,8 @@ park_gain_data = cfg.data_dir / 'park_gain_df.tsv'
 park_loss_sig_data = cfg.data_dir / 'park_loss_df_sig_only.tsv'
 park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
 
+MIN_N_MUTATED = 15
+
 
 # ### Load information for Park et al. genes
 
@@ -136,8 +138,6 @@ clinical_df.head()
 
 
 # ### Get mutated samples info
-# 
-# TODO: move this to a function/utilities file
 
 # In[10]:
 
@@ -330,7 +330,7 @@ def plot_id(identifier, id_clinical_df):
         n_mutant = id_clinical_df[mut_col].sum()
         n_wildtype = id_clinical_df.shape[0] - n_mutant
 
-        for is_mutated in id_clinical_df[mut_col].unique():
+        for is_mutated in sorted(id_clinical_df[mut_col].unique()):
             mask_mutated = (id_clinical_df[mut_col] == is_mutated)
             time_treatment, survival_prob_treatment = kaplan_meier_estimator(
                 id_clinical_df['status'][mask_mutated],
@@ -368,9 +368,11 @@ plot_id(identifier, id_clinical_df)
 
 # ### Run for all "class 2" genes
 # 
-# We'll just start here for now, these are all tumor suppressors that Park et al. have annotated as "two-hit loss" drivers (i.e. classical tumor suppressors).
+# These are all tumor suppressors that Park et al. have annotated as "two-hit loss" drivers (i.e. classical tumor suppressors).
 # 
-# We want to see how many of them (if any) distinguish between survival groups more effectively for two-hit samples as opposed to one-hit samples (TODO: be a bit clearer with what we're doing here).
+# We want to see how many of them (if any) distinguish between survival groups more effectively for two-hit samples as opposed to one-hit samples. On average, if their classes make sense we would expect to see that a comparison between two-hit samples and all other samples gives us "better" survival groups than a comparison between 1+ hit samples and 0-hit samples.
+# 
+# We'll quantify "better" using a log-rank test with the above groups, and look at the difference in test statistics. This is going to be somewhat dependent on sample size but it should give us a general idea of whether or not there's any survival-related signal in these mutation groups across genes/cancer types.
 
 # In[21]:
 
@@ -444,10 +446,25 @@ class_2_surv_df['ts_diff'] = class_2_surv_df.chisq - class_2_surv_df.chisq_alt
 class_2_surv_df['p_val_diff'] = class_2_surv_df.p_val - class_2_surv_df.p_val_alt
 
 print(class_2_surv_df.shape)
-class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
 
 # In[23]:
+
+
+# filter to genes that have at least MIN_N_MUTATED mutated samples
+if MIN_N_MUTATED > 0:
+    class_2_surv_df = (class_2_surv_df
+        .loc[(class_2_surv_df.n_mutant > MIN_N_MUTATED) &
+             (class_2_surv_df.n_wildtype > MIN_N_MUTATED) &
+             (class_2_surv_df.n_mutant_alt > MIN_N_MUTATED) &
+             (class_2_surv_df.n_wildtype_alt > MIN_N_MUTATED), :]
+    ).copy()
+    
+print(class_2_surv_df.shape)
+class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
+
+
+# In[24]:
 
 
 sns.set({'figure.figsize': (10, 8)})
@@ -492,7 +509,7 @@ show_values_on_bars(axarr[1])
 plt.tight_layout()
 
 
-# In[32]:
+# In[25]:
 
 
 sns.set({'figure.figsize': (12, 6)})
@@ -511,11 +528,17 @@ print(identifier, r'delta TS:', '{:.4f}'.format(class_2_surv_df.loc[class_2_surv
 plot_id(identifier, id_clinical_df)
 
 
+# So we can see that the "test statistic distribution" is centered around 0, meaning that in most cases either both classes distinguish similarly between survival groups, or neither do. If the "class 2" made sense as a survival marker we'd expect to see the distribution shifted to the right a bit, and we don't really see that.
+# 
+# In some cases we do see a bit of a survival difference, but most of them aren't huge, and many are likely affected by sample size (in other words, if we only have a few two-hit samples the test statistic is never going to be large, e.g. PTEN_LGG).
+
 # ### Run for all "class 1" tumor suppressors
 # 
-# TODO: describe
+# In Park et al, "class 1" tumor suppressors are "one-hit" genes, meaning a single mutation (point mutation or CNV) should contribute to cancer initiation/development.
+# 
+# Like before, we'll look at the difference between 1+ hits vs 0, and 2 hits vs. 0 or 1. Positive test statistic differences indicates that the one-hit classification gives "better" survival groups, and vice-versa.
 
-# In[33]:
+# In[26]:
 
 
 class_1_ids = (
@@ -528,7 +551,7 @@ print(len(class_1_ids))
 print(class_1_ids[:10])
 
 
-# In[37]:
+# In[27]:
 
 
 class_1_surv_df = []
@@ -585,10 +608,25 @@ class_1_surv_df['ts_diff'] = class_1_surv_df.chisq - class_1_surv_df.chisq_alt
 class_1_surv_df['p_val_diff'] = class_1_surv_df.p_val - class_1_surv_df.p_val_alt
 
 print(class_1_surv_df.shape)
+
+
+# In[28]:
+
+
+# filter to genes that have at least MIN_N_MUTATED mutated samples
+if MIN_N_MUTATED > 0:
+    class_1_surv_df = (class_1_surv_df
+        .loc[(class_1_surv_df.n_mutant > MIN_N_MUTATED) &
+             (class_1_surv_df.n_wildtype > MIN_N_MUTATED) &
+             (class_1_surv_df.n_mutant_alt > MIN_N_MUTATED) &
+             (class_1_surv_df.n_wildtype_alt > MIN_N_MUTATED), :]
+    ).copy()
+    
+print(class_1_surv_df.shape)
 class_1_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
 
-# In[38]:
+# In[29]:
 
 
 sns.set({'figure.figsize': (10, 8)})
@@ -633,7 +671,7 @@ show_values_on_bars(axarr[1])
 plt.tight_layout()
 
 
-# In[45]:
+# In[30]:
 
 
 sns.set({'figure.figsize': (12, 6)})
@@ -652,8 +690,4 @@ print(identifier, r'delta TS:', '{:.4f}'.format(class_1_surv_df.loc[class_1_surv
 plot_id(identifier, id_clinical_df)
 
 
-# In[ ]:
-
-
-
-
+# Similar to before, the class 1 test statistic distribution seems to be centered around 0. We were hoping to see more of a drastic shift in either direction, but we'll keep thinking about it.
