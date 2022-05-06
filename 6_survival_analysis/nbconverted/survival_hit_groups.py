@@ -35,7 +35,8 @@ park_gain_data = cfg.data_dir / 'park_gain_df.tsv'
 park_loss_sig_data = cfg.data_dir / 'park_loss_df_sig_only.tsv'
 park_gain_sig_data = cfg.data_dir / 'park_gain_df_sig_only.tsv'
 
-MIN_N_MUTATED = 15
+MIN_N_MUTATED = 0
+MAX_MIN_PVAL = 0.05
 
 
 # ### Load information for Park et al. genes
@@ -460,6 +461,10 @@ if MIN_N_MUTATED > 0:
              (class_2_surv_df.n_wildtype_alt > MIN_N_MUTATED), :]
     ).copy()
     
+if MAX_MIN_PVAL is not None:
+    class_2_surv_df['min_pval'] = class_2_surv_df[['p_val', 'p_val_alt']].min(axis=1)
+    class_2_surv_df = class_2_surv_df[class_2_surv_df.min_pval < MAX_MIN_PVAL].copy()
+    
 print(class_2_surv_df.shape)
 class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
@@ -517,7 +522,7 @@ sns.set_style('whitegrid')
 
 fig, axarr = plt.subplots(1, 2)
 
-identifier = 'TP53_HNSC'
+identifier = 'RB1_LIHC'
 cancer_classification = 'TSG'
 hits_classification = 'two'
 
@@ -622,6 +627,10 @@ if MIN_N_MUTATED > 0:
              (class_1_surv_df.n_wildtype_alt > MIN_N_MUTATED), :]
     ).copy()
     
+if MAX_MIN_PVAL is not None:
+    class_1_surv_df['min_pval'] = class_1_surv_df[['p_val', 'p_val_alt']].min(axis=1)
+    class_1_surv_df = class_1_surv_df[class_1_surv_df.min_pval < MAX_MIN_PVAL].copy()
+    
 print(class_1_surv_df.shape)
 class_1_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
@@ -679,7 +688,7 @@ sns.set_style('whitegrid')
 
 fig, axarr = plt.subplots(1, 2)
 
-identifier = 'BAP1_KIRC'
+identifier = 'ATRX_LGG'
 cancer_classification = 'TSG'
 hits_classification = 'one'
 
@@ -690,4 +699,6 @@ print(identifier, r'delta TS:', '{:.4f}'.format(class_1_surv_df.loc[class_1_surv
 plot_id(identifier, id_clinical_df)
 
 
-# Similar to before, the class 1 test statistic distribution seems to be centered around 0. We were hoping to see more of a drastic shift in either direction, but we'll keep thinking about it.
+# For class 1 genes, when we filter to genes/cancer types with at least 1 p-value below 0.05, the distribution of test statistic differences has a mean < 0. This suggests that 2-hit samples actually tend to differentiate better between groups of patients having differential prognosis/survival than 1+-hit samples, for genes where there is a difference.
+# 
+# This could make sense for some examples; we'll have to think through it a bit.
