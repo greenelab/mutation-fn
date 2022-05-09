@@ -250,8 +250,6 @@ def get_groups_for_gene_and_tissue(identifier,
                                    hits_classification):
     """Given a gene and tissue, load the relevant mutation/CNV information,
     and divide the samples into groups to compare survival.
-    
-    TODO document cancer_classification and hits_classification
     """
     # get patient ids (first 12 of TCGA identifier) with mutation info
     mut_patient_ids = mutation_df.index.str[:12]
