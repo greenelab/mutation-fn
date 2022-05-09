@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
 
 import sys; sys.path.append('..')
 import config as cfg
@@ -38,6 +39,16 @@ park_preds_dir = cfg.data_dir / 'park_genes_all_preds'
 
 # mutation and copy number data
 pancancer_pickle = Path('/home/jake/research/mpmp/data/pancancer_data.pkl')
+
+# gene expression/rppa data files
+data_type = 'gene expression'
+subset_feats = 100
+gene_expression_data_file = Path(
+    '/home/jake/research/mpmp/data/tcga_expression_matrix_processed.tsv.gz'
+)
+rppa_data_file = Path(
+    '/home/jake/research/mpmp/data/tcga_rppa_matrix_processed.tsv'
+)
 
 
 # ### Load mutation info
@@ -111,9 +122,55 @@ copy_gain_df.iloc[:5, :5]
 sample_freeze_df.head()
 
 
-# ### Get sample info and groups for gene/cancer type
+# ### Load expression data
+# 
+# We'll also subset to the top features by mean absolute deviation, if that option .
 
 # In[11]:
+
+
+if data_type == 'gene expression':
+    exp_df = pd.read_csv(gene_expression_data_file, sep='\t', index_col=0)
+elif data_type == 'rppa':
+    exp_df = pd.read_csv(rppa_data_file, sep='\t', index_col=0)
+    
+print(exp_df.shape)
+exp_df.iloc[:5, :5]
+
+
+# In[12]:
+
+
+# standardize features first
+exp_df = pd.DataFrame(
+    StandardScaler().fit_transform(exp_df),
+    index=exp_df.index.copy(),
+    columns=exp_df.columns.copy()
+)
+print(exp_df.shape)
+exp_df.iloc[:5, :5]
+
+
+# In[13]:
+
+
+# subset to subset_feats features by mean absolute deviation
+if subset_feats is not None:
+    mad_ranking = (
+        exp_df.mad(axis=0)
+               .sort_values(ascending=False)
+    )
+    top_feats = mad_ranking[:subset_feats].index.astype(str).values
+    print(top_feats[:5])
+    exp_df = exp_df.reindex(top_feats, axis='columns')
+    
+print(exp_df.shape)
+exp_df.iloc[:5, :5]
+
+
+# ### Get sample info and groups for gene/cancer type
+
+# In[14]:
 
 
 def get_hits_for_gene_and_tissue(identifier, cancer_classification):
@@ -144,7 +201,7 @@ def get_hits_for_gene_and_tissue(identifier, cancer_classification):
     )
 
 
-# In[12]:
+# In[15]:
 
 
 sample_mut_df = get_hits_for_gene_and_tissue('ATRX_LGG', 'TSG')
@@ -153,7 +210,7 @@ print(sample_mut_df.shape)
 sample_mut_df.iloc[:5, :5]
 
 
-# In[13]:
+# In[16]:
 
 
 sample_mut_df.sum()
