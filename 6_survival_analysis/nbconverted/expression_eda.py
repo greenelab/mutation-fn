@@ -42,7 +42,7 @@ pancancer_pickle = Path('/home/jake/research/mpmp/data/pancancer_data.pkl')
 
 # gene expression/rppa data files
 data_type = 'gene expression'
-subset_feats = 100
+subset_feats = 10000
 gene_expression_data_file = Path(
     '/home/jake/research/mpmp/data/tcga_expression_matrix_processed.tsv.gz'
 )
@@ -168,7 +168,7 @@ print(exp_df.shape)
 exp_df.iloc[:5, :5]
 
 
-# ### Get sample info and groups for gene/cancer type
+# ### Get sample info and hit groups for gene/cancer type
 
 # In[14]:
 
@@ -193,25 +193,92 @@ def get_hits_for_gene_and_tissue(identifier, cancer_classification):
         
     # get hit groups from mutation/CNV data
     two_hit_samples = (mutation_status & copy_status).astype(int)
-    one_hit_samples = (mutation_status ^ copy_status).astype(int)
+    one_hit_samples = (mutation_status | copy_status).astype(int)
         
     return pd.DataFrame(
-        {'one_hit': one_hit_samples,
-         'two_hit': two_hit_samples}
+        {'group': one_hit_samples + two_hit_samples}
     )
 
 
 # In[15]:
 
 
-sample_mut_df = get_hits_for_gene_and_tissue('ATRX_LGG', 'TSG')
+identifier = 'IDH1_LGG'
+cancer_classification = 'Oncogene'
+
+sample_mut_df = get_hits_for_gene_and_tissue(identifier, cancer_classification)
+
+# make sure sample data overlaps exactly with expression data
+overlap_ixs = sample_mut_df.index.intersection(exp_df.index)
+sample_mut_df = sample_mut_df.loc[overlap_ixs, :].copy()
+exp_df = exp_df.loc[overlap_ixs, :].copy()
+
+# add group info for legends
+sample_mut_df['group'] = sample_mut_df.group.map({
+    0: 'wild-type',
+    1: 'one-hit',
+    2: 'two-hit'
+})
 
 print(sample_mut_df.shape)
+print(sample_mut_df.group.unique())
 sample_mut_df.iloc[:5, :5]
 
+
+# ### Plot samples by hit group
 
 # In[16]:
 
 
-sample_mut_df.sum()
+from sklearn.decomposition import PCA
+
+pca = PCA(n_components=2)
+
+X_proj_pca = pca.fit_transform(exp_df)
+
+print(X_proj_pca.shape)
+X_proj_pca[:5, :5]
+
+
+# In[17]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+sns.scatterplot(x=X_proj_pca[:, 0],
+                y=X_proj_pca[:, 1],
+                hue=sample_mut_df.group)
+
+plt.title('PCA of {} {} features, colored by {} status'.format(
+    subset_feats, data_type, identifier))
+plt.xlabel('PC1')
+plt.ylabel('PC2')
+
+
+# In[18]:
+
+
+from umap import UMAP
+
+reducer = UMAP(n_components=2, random_state=42)
+
+X_proj_umap = reducer.fit_transform(exp_df)
+
+print(X_proj_umap.shape)
+X_proj_umap[:5, :5]
+
+
+# In[19]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+sns.scatterplot(x=X_proj_umap[:, 0],
+                y=X_proj_umap[:, 1],
+                hue=sample_mut_df.group)
+
+plt.title('UMAP of {} {} features, colored by {} status'.format(
+    subset_feats, data_type, identifier))
+plt.xlabel('UMAP1')
+plt.ylabel('UMAP2')
 
