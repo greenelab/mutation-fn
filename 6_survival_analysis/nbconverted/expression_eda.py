@@ -162,10 +162,12 @@ if subset_feats is not None:
     )
     top_feats = mad_ranking[:subset_feats].index.astype(str).values
     print(top_feats[:5])
-    exp_df = exp_df.reindex(top_feats, axis='columns')
+    exp_mad_df = exp_df.reindex(top_feats, axis='columns')
+else:
+    exp_mad_df = exp_df
     
-print(exp_df.shape)
-exp_df.iloc[:5, :5]
+print(exp_mad_df.shape)
+exp_mad_df.iloc[:5, :5]
 
 
 # ### Get sample info and hit groups for gene/cancer type
@@ -203,15 +205,15 @@ def get_hits_for_gene_and_tissue(identifier, cancer_classification):
 # In[15]:
 
 
-identifier = 'IDH1_LGG'
+identifier = 'ATRX_LGG'
 cancer_classification = 'Oncogene'
 
 sample_mut_df = get_hits_for_gene_and_tissue(identifier, cancer_classification)
 
 # make sure sample data overlaps exactly with expression data
-overlap_ixs = sample_mut_df.index.intersection(exp_df.index)
+overlap_ixs = sample_mut_df.index.intersection(exp_mad_df.index)
 sample_mut_df = sample_mut_df.loc[overlap_ixs, :].copy()
-exp_df = exp_df.loc[overlap_ixs, :].copy()
+exp_mad_df = exp_mad_df.loc[overlap_ixs, :].copy()
 
 # add group info for legends
 sample_mut_df['group'] = sample_mut_df.group.map({
@@ -234,7 +236,7 @@ from sklearn.decomposition import PCA
 
 pca = PCA(n_components=2)
 
-X_proj_pca = pca.fit_transform(exp_df)
+X_proj_pca = pca.fit_transform(exp_mad_df)
 
 print(X_proj_pca.shape)
 X_proj_pca[:5, :5]
@@ -247,7 +249,8 @@ sns.set({'figure.figsize': (8, 6)})
 
 sns.scatterplot(x=X_proj_pca[:, 0],
                 y=X_proj_pca[:, 1],
-                hue=sample_mut_df.group)
+                hue=sample_mut_df.group,
+                hue_order=['wild-type', 'one-hit', 'two-hit'])
 
 plt.title('PCA of {} {} features, colored by {} status'.format(
     subset_feats, data_type, identifier))
@@ -262,7 +265,7 @@ from umap import UMAP
 
 reducer = UMAP(n_components=2, random_state=42)
 
-X_proj_umap = reducer.fit_transform(exp_df)
+X_proj_umap = reducer.fit_transform(exp_mad_df)
 
 print(X_proj_umap.shape)
 X_proj_umap[:5, :5]
@@ -275,10 +278,95 @@ sns.set({'figure.figsize': (8, 6)})
 
 sns.scatterplot(x=X_proj_umap[:, 0],
                 y=X_proj_umap[:, 1],
-                hue=sample_mut_df.group)
+                hue=sample_mut_df.group,
+                hue_order=['wild-type', 'one-hit', 'two-hit'])
 
 plt.title('UMAP of {} {} features, colored by {} status'.format(
     subset_feats, data_type, identifier))
+plt.xlabel('UMAP1')
+plt.ylabel('UMAP2')
+
+
+# ### Plot samples by hit group, using features selected by pan-cancer classifiers
+
+# In[20]:
+
+
+coefs_file = Path(
+    '/home/jake/research/mpmp/data/final_models/final_expression_all_merged_coefs.tsv'
+)
+
+coefs_df = pd.read_csv(coefs_file, sep='\t', index_col=0)
+coefs_df.iloc[:5, :5]
+
+
+# In[21]:
+
+
+gene, tissue = identifier.split('_')
+
+coefs_gene = coefs_df.loc[:, gene]
+coefs_gene = coefs_gene[(~coefs_gene.isna()) &
+                        (~(coefs_gene == 0.0)) &
+                        # get rid of log10_mut and cancer type covariates
+                        (coefs_gene.index.astype(str).str.isdigit())]
+
+coefs_gene.index = coefs_gene.index.astype(str)
+
+print(coefs_gene.shape)
+coefs_gene.head()
+
+
+# In[22]:
+
+
+print(coefs_gene.index)
+print(coefs_gene.index.isna().sum())
+
+
+# In[23]:
+
+
+exp_coefs_df = exp_df.loc[overlap_ixs, coefs_gene.index].copy()
+
+print(exp_coefs_df.shape)
+exp_coefs_df.iloc[:5, :5]
+
+
+# In[24]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+pca = PCA(n_components=2)
+X_proj_pca = pca.fit_transform(exp_coefs_df)
+
+sns.scatterplot(x=X_proj_pca[:, 0],
+                y=X_proj_pca[:, 1],
+                hue=sample_mut_df.group,
+                hue_order=['wild-type', 'one-hit', 'two-hit'])
+
+plt.title('PCA of non-zero {} features, colored by {} status'.format(
+    data_type, identifier))
+plt.xlabel('PC1')
+plt.ylabel('PC2')
+
+
+# In[25]:
+
+
+sns.set({'figure.figsize': (8, 6)})
+
+reducer = UMAP(n_components=2, random_state=42)
+X_proj_umap = reducer.fit_transform(exp_coefs_df)
+
+sns.scatterplot(x=X_proj_umap[:, 0],
+                y=X_proj_umap[:, 1],
+                hue=sample_mut_df.group,
+                hue_order=['wild-type', 'one-hit', 'two-hit'])
+
+plt.title('UMAP of nonzero {} features, colored by {} status'.format(
+    data_type, identifier))
 plt.xlabel('UMAP1')
 plt.ylabel('UMAP2')
 
