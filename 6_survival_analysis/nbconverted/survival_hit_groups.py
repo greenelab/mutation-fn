@@ -128,11 +128,8 @@ clinical_df.loc[pfi_samples, 'status'] = clinical_df[pfi_samples]['PFI'].astype(
 
 # clean up columns and drop samples with NA survival times
 na_survival_times = (clinical_df['time_in_days'].isna())
-cols_to_keep = ['status', 'time_in_days', 'age', 'type']
+cols_to_keep = ['status', 'time_in_days', 'type']
 clinical_df = clinical_df.loc[~na_survival_times, cols_to_keep].copy()
-
-# mean impute missing age values
-clinical_df.age.fillna(clinical_df.age.mean(), inplace=True)
 
 print(clinical_df.shape)
 clinical_df.head()
@@ -251,20 +248,29 @@ def get_groups_for_gene_and_tissue(identifier,
     """Given a gene and tissue, load the relevant mutation/CNV information,
     and divide the samples into groups to compare survival.
     
-    TODO document cancer_classification and hits_classification
+    cancer_classification is the classification of the gene as "Oncogene" or
+    "TSG", hits_classification is the classification of the gene as "one" (a
+    one-hit gene) or "two" (a 2+-hit gene).
     """
     # get patient ids (first 12 of TCGA identifier) with mutation info
     mut_patient_ids = mutation_df.index.str[:12]
     
     # get patient ids in given cancer type 
     gene, tissue = identifier.split('_')
-    tissue_ids = (clinical_df
-        .query('type == @tissue')
-        .index
-        # mutation_df and the CNV dfs have the same index, so we
-        # only have to check this one rather than all of them
-        .intersection(mut_patient_ids)
-    )
+    if tissue == 'COADREAD':
+        tissue_ids = (clinical_df
+            .query('type == "COAD" or type == "READ"')
+            .index
+            .intersection(mut_patient_ids)
+        )
+    else:
+        tissue_ids = (clinical_df
+            .query('type == @tissue')
+            .index
+            # mutation_df and the CNV dfs have the same index, so we
+            # only have to check this one rather than all of them
+            .intersection(mut_patient_ids)
+        )
     id_clinical_df = clinical_df.loc[tissue_ids, :].copy()
     
     # get mutation and copy status
@@ -420,17 +426,12 @@ for identifier in class_2_ids:
         n_mutant = id_clinical_df[mut_col].sum()
         n_wildtype = id_clinical_df.shape[0] - n_mutant
         
-        if n_mutant == 0 or n_wildtype == 0:
+        if n_mutant < 2 or n_wildtype < 2:
             print(identifier, mut_col, n_mutant, n_wildtype, file=sys.stderr)
             continue
     
         # hypothesis testing using log-rank test
-        try:
-            y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
-        except ValueError:
-            # this happens for COADREAD, TODO fix it later
-            print(identifier, file=sys.stderr)
-            continue
+        y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
         chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
         results += [n_mutant, n_wildtype, chisq, p_val]
         
@@ -590,13 +591,7 @@ for identifier in class_1_ids:
             continue
     
         # hypothesis testing using log-rank test
-        try:
-            y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
-        except ValueError:
-            # this happens for COADREAD, TODO fix it later
-            print(identifier, file=sys.stderr)
-            continue
-            
+        y = Surv.from_dataframe('status', 'time_in_days', id_clinical_df)
         chisq, p_val = compare_survival(y, id_clinical_df[mut_col].values)
         results += [n_mutant, n_wildtype, chisq, p_val]
         
