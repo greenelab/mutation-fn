@@ -20,6 +20,10 @@ from sksurv.util import Surv
 
 import sys; sys.path.append('..')
 import config as cfg
+from data_utilities import load_cnv_data
+
+get_ipython().run_line_magic('load_ext', 'autoreload')
+get_ipython().run_line_magic('autoreload', '2')
 
 
 # In[2]:
@@ -160,86 +164,32 @@ mutation_df.iloc[:5, :5]
 # In[12]:
 
 
-# we use the data source and preprocessing code from the pancancer repo, here:
-# https://github.com/greenelab/pancancer/blob/d1b3de7fa387d0a44d0a4468b0ac30918ed66886/scripts/initialize/process_copynumber.py#L21
-
-copy_thresh_df = (
-    pd.read_csv(cfg.data_dir / 'pancan_GISTIC_threshold.tsv',
-                sep='\t', index_col=0)
-      .drop(columns=['Locus ID', 'Cytoband'])
-)
-copy_thresh_df.columns = copy_thresh_df.columns.str[0:15]
-
-# thresholded copy number includes 5 values [-2, -1, 0, 1, 2], which
-# correspond to "deep loss", "moderate loss", "no change",
-# "moderate gain", and "deep gain", respectively.
-print(copy_thresh_df.shape)
-copy_thresh_df.iloc[:5, :5]
+sample_freeze_df = pancancer_data[0]
+copy_samples = set(sample_freeze_df.SAMPLE_BARCODE)
+print(len(copy_samples))
 
 
 # In[13]:
 
 
-sample_freeze_df = pancancer_data[0]
-copy_samples = list(
-    set(sample_freeze_df.SAMPLE_BARCODE)
-    .intersection(set(copy_thresh_df.columns))
-)
-print(len(copy_samples))
-
-
-# In[14]:
-
-
-# make sure we're not losing too many samples, a few is fine
-print(sorted(set(sample_freeze_df.SAMPLE_BARCODE) - set(copy_thresh_df.columns)))
-
-
-# In[15]:
-
-
-copy_thresh_df = (copy_thresh_df
-    .T
-    .loc[sorted(copy_samples)]
-    .fillna(0)
-    .astype(int)
-)
-
-print(copy_thresh_df.shape)
-copy_thresh_df.iloc[:5, :5]
-
-
-# In[16]:
-
-
-# here, we want to use "moderate" and "deep" loss/gain to define CNV
-# loss/gain (to match Park et al.)
-#
-# note that this is different to the more conservative approach of using
-# "deep loss/gain" only as in our classifiers
-
-copy_loss_df = (copy_thresh_df
-    .replace(to_replace=[1, 2], value=0)
-    .replace(to_replace=[-1, -2], value=1)
+copy_loss_df, copy_gain_df = load_cnv_data(
+    cfg.data_dir / 'pancan_GISTIC_threshold.tsv',
+    copy_samples
 )
 print(copy_loss_df.shape)
 copy_loss_df.iloc[:5, :5]
 
 
-# In[17]:
+# In[14]:
 
 
-copy_gain_df = (copy_thresh_df
-    .replace(to_replace=[-1, -2], value=0)
-    .replace(to_replace=[1, 2], value=1)
-)
 print(copy_gain_df.shape)
 copy_gain_df.iloc[:5, :5]
 
 
 # ### Get sample info and groups for gene/cancer type
 
-# In[18]:
+# In[15]:
 
 
 def get_groups_for_gene_and_tissue(identifier,
@@ -300,7 +250,7 @@ def get_groups_for_gene_and_tissue(identifier,
     return id_clinical_df
 
 
-# In[19]:
+# In[16]:
 
 
 # test for a selected example
@@ -317,7 +267,7 @@ print(id_clinical_df.isna().sum())
 id_clinical_df.head()
 
 
-# In[20]:
+# In[17]:
 
 
 # plot groups
@@ -381,7 +331,7 @@ plot_id(identifier, id_clinical_df)
 # 
 # We'll quantify "better" using a log-rank test with the above groups, and look at the difference in test statistics. This is going to be somewhat dependent on sample size but it should give us a general idea of whether or not there's any survival-related signal in these mutation groups across genes/cancer types.
 
-# In[21]:
+# In[18]:
 
 
 class_2_ids = park_loss_sig_df.index.unique()
@@ -398,7 +348,7 @@ print(class_2_ids[:10])
 # * \# mutant samples (alt classification)
 # * survival p-value (alt classification)
 
-# In[22]:
+# In[19]:
 
 
 class_2_surv_df = []
@@ -450,7 +400,7 @@ class_2_surv_df['p_val_diff'] = class_2_surv_df.p_val - class_2_surv_df.p_val_al
 print(class_2_surv_df.shape)
 
 
-# In[23]:
+# In[20]:
 
 
 # filter to genes that have at least MIN_N_MUTATED mutated samples
@@ -470,7 +420,7 @@ print(class_2_surv_df.shape)
 class_2_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
 
-# In[24]:
+# In[21]:
 
 
 sns.set({'figure.figsize': (10, 8)})
@@ -515,7 +465,7 @@ show_values_on_bars(axarr[1])
 plt.tight_layout()
 
 
-# In[25]:
+# In[22]:
 
 
 sns.set({'figure.figsize': (12, 6)})
@@ -544,7 +494,7 @@ plot_id(identifier, id_clinical_df)
 # 
 # Like before, we'll look at the difference between 1+ hits vs 0, and 2 hits vs. 0 or 1. Positive test statistic differences indicates that the one-hit classification gives "better" survival groups, and vice-versa.
 
-# In[26]:
+# In[23]:
 
 
 class_1_ids = (
@@ -557,7 +507,7 @@ print(len(class_1_ids))
 print(class_1_ids[:10])
 
 
-# In[27]:
+# In[24]:
 
 
 class_1_surv_df = []
@@ -610,7 +560,7 @@ class_1_surv_df['p_val_diff'] = class_1_surv_df.p_val - class_1_surv_df.p_val_al
 print(class_1_surv_df.shape)
 
 
-# In[28]:
+# In[25]:
 
 
 # filter to genes that have at least MIN_N_MUTATED mutated samples
@@ -630,7 +580,7 @@ print(class_1_surv_df.shape)
 class_1_surv_df.sort_values(by='ts_diff', ascending=False).head(20)
 
 
-# In[29]:
+# In[26]:
 
 
 sns.set({'figure.figsize': (10, 8)})
@@ -675,7 +625,7 @@ show_values_on_bars(axarr[1])
 plt.tight_layout()
 
 
-# In[30]:
+# In[27]:
 
 
 sns.set({'figure.figsize': (12, 6)})
