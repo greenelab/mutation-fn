@@ -61,7 +61,7 @@ min_sample_count = 15
 
 # ### Load expression data
 # 
-# We'll also subset to the top features by mean absolute deviation, if that option .
+# We'll also subset to the top features by mean absolute deviation, if `subset_feats` is set.
 
 # In[3]:
 

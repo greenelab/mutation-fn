@@ -124,7 +124,7 @@ sample_freeze_df.head()
 
 # ### Load expression data
 # 
-# We'll also subset to the top features by mean absolute deviation, if that option .
+# We'll also standardize each feature, and subset to the top features by mean absolute deviation if `subset_feats` is set.
 
 # In[11]:
 
@@ -161,7 +161,6 @@ if subset_feats is not None:
                .sort_values(ascending=False)
     )
     top_feats = mad_ranking[:subset_feats].index.astype(str).values
-    print(top_feats[:5])
     exp_mad_df = exp_df.reindex(top_feats, axis='columns')
 else:
     exp_mad_df = exp_df
